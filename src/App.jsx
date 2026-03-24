@@ -88,14 +88,22 @@ function shuffle(arr) {
   return a;
 }
 
+// Resolves a MM-DD birthday to a real Date in the given year.
+// Feb 29 on a non-leap year falls back to Feb 28.
+function birthdayInYear(month, day, year) {
+  const isLeap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  const resolvedDay = (month === 2 && day === 29 && !isLeap) ? 28 : day;
+  return new Date(year, month - 1, resolvedDay);
+}
+
 function getBirthdayStatus(birthday) {
   if (!birthday) return null;
   const today = new Date();
   const [month, day] = birthday.split("-").map(Number);
   if (!month || !day) return null;
-  let bday = new Date(today.getFullYear(), month - 1, day);
   const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  if (bday < todayMidnight) bday = new Date(today.getFullYear() + 1, month - 1, day);
+  let bday = birthdayInYear(month, day, today.getFullYear());
+  if (bday < todayMidnight) bday = birthdayInYear(month, day, today.getFullYear() + 1);
   const diff = Math.round((bday - todayMidnight) / 86400000);
   if (diff === 0) return { label: "🎂 Birthday today!", urgent: true };
   if (diff === 1) return { label: "🎂 Birthday tomorrow!", urgent: true };
@@ -118,8 +126,8 @@ function getUpcomingBirthdays(people) {
     if (!p.birthday) continue;
     const [month, day] = p.birthday.split("-").map(Number);
     if (!month || !day) continue;
-    let bday = new Date(today.getFullYear(), month - 1, day);
-    if (bday < todayMidnight) bday = new Date(today.getFullYear() + 1, month - 1, day);
+    let bday = birthdayInYear(month, day, today.getFullYear());
+    if (bday < todayMidnight) bday = birthdayInYear(month, day, today.getFullYear() + 1);
     const diff = Math.round((bday - todayMidnight) / 86400000);
     if (diff <= 7) results.push({ person: p, diff, date: bday });
   }
@@ -392,6 +400,19 @@ export default function App() {
   const prayedCount = activePeople.filter(p => withinWeek(p.prayedAt)).length;
   const upcomingBdays = getUpcomingBirthdays(activePeople);
   const urgentBdays = upcomingBdays.filter(b => b.diff <= 3).length;
+
+  function goToPerson(personId) {
+    setView("pray");
+    setDropdownOpen(false);
+    const deckIdx = deck.findIndex(p => p.id === personId);
+    if (deckIdx >= 0) {
+      setPinnedPersonId(null);
+      setCardIdx(deckIdx);
+    } else {
+      setPinnedPersonId(personId);
+    }
+    if (!ready) { setReady(true); recordTapShown(); }
+  }
 
   function nav(dir) {
     setReqFor(null);
@@ -783,7 +804,7 @@ export default function App() {
                 <span style={S.sectionTitle}>Upcoming Birthdays</span>
               </div>
               {upcomingBdays.map(({ person, diff, date }) => (
-                <div key={person.id} style={{ ...S.weekRow, ...(diff === 0 ? { background: "#1e1608" } : {}) }}>
+                <div key={person.id} onClick={() => goToPerson(person.id)} style={{ ...S.weekRow, ...(diff === 0 ? { background: "#1e1608" } : {}), cursor: "pointer" }}>
                   <div>
                     <div style={S.weekName}>{person.name}</div>
                     <div style={S.weekMeta}>{diff === 0 ? "🎉 Today!" : diff === 1 ? "Tomorrow" : date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
@@ -805,7 +826,7 @@ export default function App() {
             {prayedThis.length === 0
               ? <p style={S.weekEmpty}>No one marked yet this week.</p>
               : prayedThis.map(p => (
-                <div key={p.id} style={S.weekRow}>
+                <div key={p.id} onClick={() => goToPerson(p.id)} style={{ ...S.weekRow, cursor: "pointer" }}>
                   <div>
                     <div style={S.weekName}>{p.name}</div>
                     <div style={S.weekMeta}>{timeAgo(p.prayedAt)}</div>
@@ -830,7 +851,7 @@ export default function App() {
                 <span style={S.allPrayedText}>Everyone prayed for this week!</span>
               </div>
             ) : notPrayedThis.map(p => (
-              <div key={p.id} style={S.weekRow}>
+              <div key={p.id} onClick={() => goToPerson(p.id)} style={{ ...S.weekRow, cursor: "pointer" }}>
                 <div>
                   <div style={{ ...S.weekName, color: C.muted }}>{p.name}</div>
                   {p.prayedAt && <div style={S.weekMeta}>Last: {timeAgo(p.prayedAt)}</div>}
