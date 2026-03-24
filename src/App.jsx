@@ -337,32 +337,42 @@ export default function App() {
     })();
   }, []);
 
-  // Save to KV (debounced 1.5s)
+  // Track whether current people state came from a remote poll (no save needed)
+  const fromPoll = useRef(false);
+  const lastSaved = useRef(null);
+
+  // Save to KV (debounced 1.5s) — only when change came from user, not poll
   useEffect(() => {
     if (!loaded) return;
+    if (fromPoll.current) { fromPoll.current = false; return; }
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
+      const snapshot = JSON.stringify(people);
+      if (snapshot === lastSaved.current) return; // already saved this
       isSaving.current = true;
       await apiSave(people).catch(() => {});
+      lastSaved.current = snapshot;
       isSaving.current = false;
     }, 1500);
     return () => clearTimeout(saveTimer.current);
   }, [people, loaded]);
 
-  // Poll for remote changes every 15s — skip if we're mid-save
+  // Poll for remote changes every 15s
   useEffect(() => {
     if (!loaded) return;
-    pollTimer.current = setInterval(async () => {
+    const poll = async () => {
       if (isSaving.current) return;
       try {
         const fresh = await apiLoad();
         const freshStr = JSON.stringify(fresh);
         setPeople(prev => {
-          if (JSON.stringify(prev) === freshStr) return prev; // no change
+          if (JSON.stringify(prev) === freshStr) return prev;
+          fromPoll.current = true;
           return fresh;
         });
       } catch {}
-    }, 15000);
+    };
+    pollTimer.current = setInterval(poll, 15000);
     return () => clearInterval(pollTimer.current);
   }, [loaded]);
 
