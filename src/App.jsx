@@ -113,10 +113,13 @@ function normalizeName(raw) {
 function parseBirthdayStr(raw) {
   if (!raw) return "";
   const cleaned = raw.trim();
-  // numeric: 03/15, 3-15, 03/15/2005, etc.
+  // YYYY-MM-DD (ISO format - e.g. 2009-01-15)
+  const iso = cleaned.match(/^\d{4}[\-\/](\d{1,2})[\-\/](\d{1,2})$/);
+  if (iso) return `${iso[1].padStart(2, "0")}-${iso[2].padStart(2, "0")}`;
+  // MM/DD or MM-DD or M/D (e.g. 03/15, 3-15)
   const numeric = cleaned.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-]\d{2,4})?$/);
   if (numeric) return `${numeric[1].padStart(2, "0")}-${numeric[2].padStart(2, "0")}`;
-  // month name: "March 15", "15 March", "March 15, 2005"
+  // Month name: "March 15", "15 March", "March 15, 2005"
   const months = ["january","february","march","april","may","june","july","august","september","october","november","december"];
   const lower = cleaned.toLowerCase();
   for (let mi = 0; mi < months.length; mi++) {
