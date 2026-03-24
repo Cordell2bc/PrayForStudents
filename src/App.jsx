@@ -548,7 +548,7 @@ export default function App() {
           <span style={S.logoCross}>✦</span>
           <span style={S.logoText}>Calvary Students</span>
         </div>
-        <div style={S.weekBar}>
+        <div style={{ ...S.weekBar, cursor: "pointer" }} onClick={() => setView("week")}>
           <Heart size={13} color="#d4916a" fill="#d4916a" />
           <span style={S.weekText}>{prayedCount} / {activePeople.length} this week</span>
           {urgentBdays > 0 && <span style={S.bdayAlert}>🎂 {urgentBdays}</span>}
@@ -735,7 +735,7 @@ export default function App() {
                     return (
                       <div style={S.ddWrap}>
                         <button onClick={() => setDropdownOpen(o => !o)} style={S.ddToggle}>
-                          <span>Tap to Pray…</span>
+                          <span>Select a specific name</span>
                           <span style={{ fontSize: 10, opacity: 0.5 }}>{dropdownOpen ? "▲" : "▼"}</span>
                         </button>
                         {dropdownOpen && (
