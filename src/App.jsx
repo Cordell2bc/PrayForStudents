@@ -88,6 +88,11 @@ function shuffle(arr) {
   return a;
 }
 
+function ordinal(n) {
+  const s = ["th","st","nd","rd"], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
 // Resolves a MM-DD birthday to a real Date in the given year.
 // Feb 29 on a non-leap year falls back to Feb 28.
 function birthdayInYear(month, day, year) {
@@ -701,6 +706,11 @@ export default function App() {
                             {current.group.toUpperCase()}
                           </div>
                         )}
+                        {current?.type === "student" && current?.grade && (
+                          <div style={{ ...S.badge, ...S.gradeBadgeLg }}>
+                            {ordinal(current.grade)} Gr
+                          </div>
+                        )}
                       </div>
                       <h2 style={S.cardName}>{current?.name}</h2>
 
@@ -932,7 +942,7 @@ export default function App() {
                     <div style={S.personMeta}>
                       <span style={{ ...S.badgeSm, ...(p.type === "leader" ? S.leaderBadgeSm : S.studentBadgeSm) }}>{p.type}</span>
                       {p.group && <span style={{ ...S.badgeSm, ...(p.group === "hs" ? S.hsBadgeSm : S.msBadgeSm) }}>{p.group.toUpperCase()}</span>}
-                      {p.type === "student" && p.grade && <span style={S.gradeBadge}>Gr {p.grade}</span>}
+                      {p.type === "student" && p.grade && <span style={S.gradeBadge}>{ordinal(p.grade)} Gr</span>}
                       {withinWeek(p.prayedAt) && <span style={S.prayedSmall}>✓ prayed</span>}
                       {(p.prayerRequests || []).length > 0 && <span style={S.reqCountBadge}>{p.prayerRequests.length} req</span>}
                       {p.birthday && <span style={S.bdayBadgeSm}><Cake size={9} style={{ marginRight: 3 }} />{formatBirthday(p.birthday)}</span>}
@@ -1189,6 +1199,7 @@ const S = {
   personActions: { display: "flex", gap: 6 },
   iconBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
   gradeBadge: { fontSize: 10, padding: "2px 7px", borderRadius: 8, background: "#1e1a10", color: "#9a8850", fontWeight: 500 },
+  gradeBadgeLg: { background: "#1e1a10", color: "#9a8850", border: "1px solid #9a885033", marginBottom: 0 },
   gradeRow: { display: "flex", alignItems: "center", gap: 10, padding: "7px 12px", borderTop: `1px solid ${C.faint}`, background: "#141108" },
   gradeLabel: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0 },
   gradeSelect: { background: "#0e0c09", border: `1px solid ${C.border}`, borderRadius: 7, color: C.cream, padding: "4px 8px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", outline: "none" },
