@@ -46,6 +46,25 @@ async function apiSave(people) {
   });
 }
 
+async function apiLoadHistory() {
+  const res = await fetch("/api/history");
+  if (!res.ok) return [];
+  return await res.json();
+}
+
+async function apiSaveHistory(history) {
+  await fetch("/api/history", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(history),
+  });
+}
+
+function getWeekLabel(weekStartTs) {
+  const d = new Date(weekStartTs);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" });
+}
+
 function genId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
@@ -284,6 +303,7 @@ export default function App() {
   const touchStartY = useRef(null);
   const [swipeDelta, setSwipeDelta] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
+  const [cardAnim, setCardAnim] = useState("idle"); // idle | exiting-left | exiting-right | entering-left | entering-right
 
   // People mgmt
   const [addName, setAddName] = useState("");
@@ -294,6 +314,7 @@ export default function App() {
   const [editNameFor, setEditNameFor] = useState(null);
   const [nameInput, setNameInput] = useState("");
   const [confirmPromo, setConfirmPromo] = useState(false);
+  const [weekHistory, setWeekHistory] = useState([]);
   const [bdayInput, setBdayInput] = useState("");
 
   // Prayer requests
@@ -321,17 +342,41 @@ export default function App() {
     link.href = "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap";
     document.head.appendChild(link);
     const style = document.createElement("style");
-    style.textContent = `@keyframes tapPulse { 0%,100%{opacity:1} 50%{opacity:0.65} }`;
+    style.textContent = `
+  @keyframes tapPulse { 0%,100%{opacity:1} 50%{opacity:0.65} }
+  @keyframes flyOutLeft  { to { transform: translateX(-110%) rotate(-8deg); opacity: 0; } }
+  @keyframes flyOutRight { to { transform: translateX(110%)  rotate(8deg);  opacity: 0; } }
+  @keyframes flyInLeft   { from { transform: translateX(110%)  rotate(6deg);  opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes flyInRight  { from { transform: translateX(-110%) rotate(-6deg); opacity: 0; } to { transform: none; opacity: 1; } }
+`;
     document.head.appendChild(style);
     return () => { link.remove(); style.remove(); };
   }, []);
 
-  // Load from KV
+  // Load from KV + snapshot previous week if it just rolled over
   useEffect(() => {
     (async () => {
       try {
-        const data = await apiLoad();
+        const [data, history] = await Promise.all([apiLoad(), apiLoadHistory()]);
         setPeople(data);
+
+        const currentWeekStart = getWeekStartET();
+        const lastSnapshotWeek = history.length > 0 ? history[0].weekStart : null;
+
+        // If we haven't snapshotted this week yet, save last week's count
+        if (lastSnapshotWeek !== currentWeekStart) {
+          const prevWeekStart = currentWeekStart - 7 * 24 * 60 * 60 * 1000;
+          const prevWeekCount = data.filter(p =>
+            p.prayedAt && p.prayedAt >= prevWeekStart && p.prayedAt < currentWeekStart
+          ).length;
+          const total = data.filter(p => p.active !== false).length;
+          const newEntry = { weekStart: currentWeekStart, prevWeekStart, count: prevWeekCount, total };
+          const updated = [newEntry, ...history].slice(0, 3);
+          setWeekHistory(updated);
+          await apiSaveHistory(updated);
+        } else {
+          setWeekHistory(history);
+        }
       } catch {}
       setLoaded(true);
     })();
@@ -451,7 +496,7 @@ export default function App() {
     if (!ready) { setReady(true); recordTapShown(); }
   }
 
-  function nav(dir) {
+  function nav(dir, animate = false) {
     setReqFor(null);
     setSwipeDelta(0);
     setPinnedPersonId(null);
@@ -461,6 +506,17 @@ export default function App() {
       if (n >= deck.length) n = 0;
       return n;
     });
+  }
+
+  function navWithAnim(dir) {
+    const exitAnim = dir > 0 ? "exiting-left" : "exiting-right";
+    const enterAnim = dir > 0 ? "entering-left" : "entering-right";
+    setCardAnim(exitAnim);
+    setTimeout(() => {
+      nav(dir);
+      setCardAnim(enterAnim);
+      setTimeout(() => setCardAnim("idle"), 320);
+    }, 200);
   }
 
   function selectFromDropdown(personId) {
@@ -495,11 +551,22 @@ export default function App() {
   }
 
   function handleTouchEnd() {
-    if (Math.abs(swipeDelta) > 55) nav(swipeDelta < 0 ? 1 : -1);
-    else setSwipeDelta(0);
+    const delta = swipeDelta;
     setIsSwiping(false);
     touchStartX.current = null;
     touchStartY.current = null;
+    if (Math.abs(delta) > 55) {
+      const dir = delta < 0 ? "left" : "right";
+      setCardAnim(`exiting-${dir}`);
+      setTimeout(() => {
+        nav(delta < 0 ? 1 : -1);
+        setSwipeDelta(0);
+        setCardAnim(`entering-${dir === "left" ? "left" : "right"}`);
+        setTimeout(() => setCardAnim("idle"), 320);
+      }, 220);
+    } else {
+      setSwipeDelta(0);
+    }
   }
 
   function markPrayed() {
@@ -724,9 +791,15 @@ export default function App() {
                     <div style={{
                       ...S.card,
                       ...(withinWeek(current?.prayedAt) ? S.cardDone : {}),
-                      transform: isSwiping ? `translateX(${swipeDelta * 0.35}px) rotate(${swipeDelta * 0.018}deg)` : "none",
-                      transition: isSwiping ? "none" : "transform 0.25s cubic-bezier(.25,.46,.45,.94)",
-                      opacity: isSwiping ? Math.max(0.6, 1 - Math.abs(swipeDelta) / 400) : 1,
+                      ...(isSwiping ? {
+                        transform: `translateX(${swipeDelta}px) rotate(${swipeDelta * 0.04}deg)`,
+                        opacity: Math.max(0.4, 1 - Math.abs(swipeDelta) / 300),
+                        transition: "none",
+                      } : {}),
+                      ...(cardAnim === "exiting-left"  ? { animation: "flyOutLeft  0.22s ease-in forwards" } : {}),
+                      ...(cardAnim === "exiting-right" ? { animation: "flyOutRight 0.22s ease-in forwards" } : {}),
+                      ...(cardAnim === "entering-left" ? { animation: "flyInLeft  0.3s cubic-bezier(.22,.68,0,1.2) forwards" } : {}),
+                      ...(cardAnim === "entering-right"? { animation: "flyInRight 0.3s cubic-bezier(.22,.68,0,1.2) forwards" } : {}),
                     }}>
                       <div style={S.badgeRow}>
                         <div style={{ ...S.badge, ...(current?.type === "leader" ? S.leaderBadge : S.studentBadge) }}>
@@ -792,13 +865,13 @@ export default function App() {
                   </div>
 
                   <div style={S.navRow}>
-                    <button onClick={() => nav(-1)} style={S.navArrow}><ChevronLeft size={22} /></button>
+                    <button onClick={() => navWithAnim(-1)} style={S.navArrow}><ChevronLeft size={22} /></button>
                     <span style={S.counter}>
                       {pinnedPerson ? "★" : `${cardIdx + 1}`}
                       <span style={{ color: "#5a4832" }}> / </span>
                       {deck.length}
                     </span>
-                    <button onClick={() => nav(1)} style={S.navArrow}><ChevronRight size={22} /></button>
+                    <button onClick={() => navWithAnim(1)} style={S.navArrow}><ChevronRight size={22} /></button>
                   </div>
 
                   {withinWeek(current?.prayedAt) ? (
@@ -1050,6 +1123,31 @@ export default function App() {
       {/* ─── IMPORT ─── */}
       {view === "import" && (
         <div style={S.importWrap}>
+          {/* Weekly prayer report */}
+          <div style={S.reportBox}>
+            <p style={S.reportTitle}>📊 Weekly Prayer Report</p>
+            {weekHistory.length === 0 ? (
+              <p style={S.reportEmpty}>Data will appear here after the first Monday reset.</p>
+            ) : weekHistory.map((w, i) => {
+              const pct = w.total > 0 ? Math.round((w.count / w.total) * 100) : 0;
+              const label = i === 0
+                ? `Week of ${getWeekLabel(w.prevWeekStart)} (last week)`
+                : `Week of ${getWeekLabel(w.prevWeekStart)}`;
+              return (
+                <div key={w.weekStart} style={S.reportRow}>
+                  <div style={S.reportRowTop}>
+                    <span style={S.reportWeekLabel}>{label}</span>
+                    <span style={S.reportCount}>{w.count} / {w.total}</span>
+                  </div>
+                  <div style={S.reportBar}>
+                    <div style={{ ...S.reportBarFill, width: `${pct}%` }} />
+                  </div>
+                  <span style={S.reportPct}>{pct}% prayed for</span>
+                </div>
+              );
+            })}
+          </div>
+
           <h3 style={S.importTitle}>Import CSV</h3>
           <p style={S.importDesc}>
             Just export whatever roster you already have. The importer only looks for name and birthday columns — everything else is ignored.
@@ -1274,6 +1372,17 @@ const S = {
   suggestTitle: { fontSize: 13, color: C.gold, margin: "0 0 10px", fontWeight: 500 },
   suggestList: { margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 6 },
   suggestItem: { fontSize: 12, color: C.muted, lineHeight: 1.5 },
+  // WEEKLY REPORT
+  reportBox: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "16px" },
+  reportTitle: { fontSize: 13, color: C.gold, fontWeight: 500, margin: "0 0 12px" },
+  reportEmpty: { fontSize: 12, color: C.muted, margin: 0, fontStyle: "italic" },
+  reportRow: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 14 },
+  reportRowTop: { display: "flex", justifyContent: "space-between", alignItems: "baseline" },
+  reportWeekLabel: { fontSize: 12, color: C.muted },
+  reportCount: { fontSize: 16, fontFamily: "'Cormorant Garamond', serif", color: C.cream },
+  reportBar: { height: 6, background: C.faint, borderRadius: 3, overflow: "hidden" },
+  reportBarFill: { height: "100%", background: `linear-gradient(90deg, ${C.gold}, ${C.goldLight})`, borderRadius: 3, transition: "width 0.6s ease" },
+  reportPct: { fontSize: 11, color: C.muted },
   // ADMIN FOOTER
   adminFooter: { display: "flex", justifyContent: "center", padding: "12px 0 20px", marginTop: "auto" },
   adminLink: { background: "none", border: "none", color: "#2e2518", fontSize: 11, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.06em" },
