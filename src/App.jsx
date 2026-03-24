@@ -630,7 +630,7 @@ export default function App() {
         <div style={{ ...S.weekBar, cursor: "pointer" }} onClick={() => setView("week")}>
           <Heart size={13} color="#d4916a" fill="#d4916a" />
           <span style={S.weekText}>{prayedCount} / {activePeople.length} this week</span>
-          {urgentBdays > 0 && <span style={S.bdayAlert}>🎂 {urgentBdays}</span>}
+          {urgentBdays > 0 && <span style={S.bdayAlert}><span style={{lineHeight:1}}>🎂</span><span style={{lineHeight:1}}>{urgentBdays}</span></span>}
         </div>
       </header>
 
@@ -1142,7 +1142,7 @@ const S = {
   logoText: { fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: C.cream, letterSpacing: "0.04em" },
   weekBar: { display: "flex", alignItems: "center", gap: 6, background: "#1f1810", border: `1px solid ${C.border}`, borderRadius: 20, padding: "5px 12px" },
   weekText: { fontSize: 12, color: C.muted },
-  bdayAlert: { fontSize: 11, background: "#2a1e08", color: C.gold, borderRadius: 10, padding: "1px 6px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 3 },
+  bdayAlert: { fontSize: 11, background: "#2a1e08", color: C.gold, borderRadius: 10, padding: "2px 7px 2px 6px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 3, verticalAlign: "middle" },
   progressTrack: { margin: "14px 20px 0", height: 3, background: C.faint, borderRadius: 2, overflow: "hidden" },
   progressFill: { height: "100%", background: `linear-gradient(90deg, ${C.gold}, ${C.goldLight})`, borderRadius: 2, transition: "width 0.6s ease" },
   tabs: { display: "flex", borderBottom: `1px solid ${C.border}`, margin: "14px 0 0" },
