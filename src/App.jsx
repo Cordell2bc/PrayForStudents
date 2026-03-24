@@ -227,6 +227,7 @@ export default function App() {
   // People mgmt
   const [addName, setAddName] = useState("");
   const [addType, setAddType] = useState("student");
+  const [addGroup, setAddGroup] = useState("hs");
   const [search, setSearch] = useState("");
   const [editBdayFor, setEditBdayFor] = useState(null);
   const [bdayInput, setBdayInput] = useState("");
@@ -276,6 +277,12 @@ export default function App() {
     let list = activePeople;
     if (filter === "students") list = list.filter(p => p.type === "student");
     if (filter === "leaders") list = list.filter(p => p.type === "leader");
+    if (filter === "hs") list = list.filter(p => p.group === "hs");
+    if (filter === "ms") list = list.filter(p => p.group === "ms");
+    if (filter === "hs-students") list = list.filter(p => p.type === "student" && p.group === "hs");
+    if (filter === "ms-students") list = list.filter(p => p.type === "student" && p.group === "ms");
+    if (filter === "hs-leaders") list = list.filter(p => p.type === "leader" && p.group === "hs");
+    if (filter === "ms-leaders") list = list.filter(p => p.type === "leader" && p.group === "ms");
     if (filter === "unprayed") list = list.filter(p => !withinWeek(p.prayedAt));
     return list;
   }, [people, filter]);
@@ -285,6 +292,12 @@ export default function App() {
     let list = activePeople;
     if (f === "students") list = list.filter(p => p.type === "student");
     if (f === "leaders") list = list.filter(p => p.type === "leader");
+    if (f === "hs") list = list.filter(p => p.group === "hs");
+    if (f === "ms") list = list.filter(p => p.group === "ms");
+    if (f === "hs-students") list = list.filter(p => p.type === "student" && p.group === "hs");
+    if (f === "ms-students") list = list.filter(p => p.type === "student" && p.group === "ms");
+    if (f === "hs-leaders") list = list.filter(p => p.type === "leader" && p.group === "hs");
+    if (f === "ms-leaders") list = list.filter(p => p.type === "leader" && p.group === "ms");
     if (f === "unprayed") list = list.filter(p => !withinWeek(p.prayedAt));
     setDeckIds(shuffle(list.map(p => p.id)));
     setCardIdx(0);
@@ -351,8 +364,16 @@ export default function App() {
 
   function addPerson() {
     if (!addName.trim()) return;
-    setPeople(prev => [...prev, { id: genId(), name: addName.trim(), type: addType, active: true, prayedAt: null, prayerRequests: [], birthday: "" }]);
+    setPeople(prev => [...prev, { id: genId(), name: addName.trim(), type: addType, group: addType === "student" ? addGroup : null, active: true, prayedAt: null, prayerRequests: [], birthday: "" }]);
     setAddName("");
+  }
+
+  function cycleGroup(id) {
+    setPeople(prev => prev.map(p => {
+      if (p.id !== id) return p;
+      if (p.type === "leader") return { ...p, group: p.group === "hs" ? "ms" : p.group === "ms" ? null : "hs" };
+      return { ...p, group: p.group === "hs" ? "ms" : p.group === "ms" ? null : "hs" };
+    }));
   }
 
   function toggleType(id) {
@@ -392,7 +413,7 @@ export default function App() {
     const existing = new Set(people.map(p => p.name.toLowerCase()));
     const toAdd = (importData || [])
       .filter(p => !existing.has(p.name.toLowerCase()))
-      .map(p => ({ id: genId(), name: p.name, type: "student", active: true, prayedAt: null, prayerRequests: [], birthday: p.birthday || "" }));
+      .map(p => ({ id: genId(), name: p.name, type: "student", group: null, active: true, prayedAt: null, prayerRequests: [], birthday: p.birthday || "" }));
     setPeople(prev => [...prev, ...toAdd]);
     setImportData(null);
     setView("people");
@@ -443,8 +464,14 @@ export default function App() {
             </div>
             <select value={filter} onChange={e => { setFilter(e.target.value); setCardIdx(0); }} style={S.filterSelect}>
               <option value="all">Everyone</option>
-              <option value="students">Students</option>
-              <option value="leaders">Leaders</option>
+              <option value="students">All Students</option>
+              <option value="hs-students">HS Students</option>
+              <option value="ms-students">MS Students</option>
+              <option value="leaders">All Leaders</option>
+              <option value="hs-leaders">HS Leaders</option>
+              <option value="ms-leaders">MS Leaders</option>
+              <option value="hs">All HS</option>
+              <option value="ms">All MS</option>
               <option value="unprayed">Unprayed</option>
             </select>
             {order === "random" && (
@@ -472,8 +499,15 @@ export default function App() {
                   transition: isSwiping ? "none" : "transform 0.25s cubic-bezier(.25,.46,.45,.94)",
                   opacity: isSwiping ? Math.max(0.6, 1 - Math.abs(swipeDelta) / 400) : 1,
                 }}>
-                  <div style={{ ...S.badge, ...(current?.type === "leader" ? S.leaderBadge : S.studentBadge) }}>
-                    {current?.type === "leader" ? "Leader" : "Student"}
+                  <div style={S.badgeRow}>
+                    <div style={{ ...S.badge, ...(current?.type === "leader" ? S.leaderBadge : S.studentBadge) }}>
+                      {current?.type === "leader" ? "Leader" : "Student"}
+                    </div>
+                    {current?.group && (
+                      <div style={{ ...S.badge, ...(current.group === "hs" ? S.hsBadge : S.msBadge) }}>
+                        {current.group.toUpperCase()}
+                      </div>
+                    )}
                   </div>
                   <h2 style={S.cardName}>{current?.name}</h2>
 
@@ -561,7 +595,10 @@ export default function App() {
                     <div style={S.weekName}>{person.name}</div>
                     <div style={S.weekMeta}>{diff === 0 ? "🎉 Today!" : diff === 1 ? "Tomorrow" : date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
                   </div>
-                  <span style={{ ...S.badgeSm, ...(person.type === "leader" ? S.leaderBadgeSm : S.studentBadgeSm) }}>{person.type}</span>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {person.group && <span style={{ ...S.badgeSm, ...(person.group === "hs" ? S.hsBadgeSm : S.msBadgeSm) }}>{person.group.toUpperCase()}</span>}
+                    <span style={{ ...S.badgeSm, ...(person.type === "leader" ? S.leaderBadgeSm : S.studentBadgeSm) }}>{person.type}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -605,7 +642,10 @@ export default function App() {
                   <div style={{ ...S.weekName, color: C.muted }}>{p.name}</div>
                   {p.prayedAt && <div style={S.weekMeta}>Last: {timeAgo(p.prayedAt)}</div>}
                 </div>
-                <span style={{ ...S.badgeSm, ...(p.type === "leader" ? S.leaderBadgeSm : S.studentBadgeSm) }}>{p.type}</span>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {p.group && <span style={{ ...S.badgeSm, ...(p.group === "hs" ? S.hsBadgeSm : S.msBadgeSm) }}>{p.group.toUpperCase()}</span>}
+                  <span style={{ ...S.badgeSm, ...(p.type === "leader" ? S.leaderBadgeSm : S.studentBadgeSm) }}>{p.type}</span>
+                </div>
               </div>
             ))}
           </div>
@@ -621,11 +661,15 @@ export default function App() {
               <option value="student">Student</option>
               <option value="leader">Leader</option>
             </select>
+            <select value={addGroup} onChange={e => setAddGroup(e.target.value)} style={S.addTypeSelect}>
+              <option value="hs">HS</option>
+              <option value="ms">MS</option>
+            </select>
             <button onClick={addPerson} style={S.addPersonBtn}><Plus size={16} /></button>
           </div>
 
           <div style={S.statRow}>
-            {[[`${activePeople.length}`, "total"], [`${activePeople.filter(p => p.type === "student").length}`, "students"], [`${activePeople.filter(p => p.type === "leader").length}`, "leaders"], [`${prayedCount}`, "prayed ✓"]].map(([n, l]) => (
+            {[[`${activePeople.length}`, "total"], [`${activePeople.filter(p => p.group === "hs").length}`, "HS"], [`${activePeople.filter(p => p.group === "ms").length}`, "MS"], [`${prayedCount}`, "prayed ✓"]].map(([n, l]) => (
               <div key={l} style={S.statChip}><span style={S.statNum}>{n}</span><span style={S.statLbl}>{l}</span></div>
             ))}
           </div>
@@ -640,6 +684,7 @@ export default function App() {
                     <span style={S.personName}>{p.name}</span>
                     <div style={S.personMeta}>
                       <span style={{ ...S.badgeSm, ...(p.type === "leader" ? S.leaderBadgeSm : S.studentBadgeSm) }}>{p.type}</span>
+                      {p.group && <span style={{ ...S.badgeSm, ...(p.group === "hs" ? S.hsBadgeSm : S.msBadgeSm) }}>{p.group.toUpperCase()}</span>}
                       {withinWeek(p.prayedAt) && <span style={S.prayedSmall}>✓ prayed</span>}
                       {(p.prayerRequests || []).length > 0 && <span style={S.reqCountBadge}>{p.prayerRequests.length} req</span>}
                       {p.birthday && <span style={S.bdayBadgeSm}><Cake size={9} style={{ marginRight: 3 }} />{formatBirthday(p.birthday)}</span>}
@@ -648,6 +693,9 @@ export default function App() {
                   <div style={S.personActions}>
                     <button onClick={() => { setEditBdayFor(editBdayFor === p.id ? null : p.id); setBdayInput(p.birthday || ""); }}
                       style={{ ...S.iconBtn, color: p.birthday ? C.gold : C.muted }} title="Set birthday"><Cake size={13} /></button>
+                    <button onClick={() => cycleGroup(p.id)} style={{ ...S.iconBtn, color: p.group === "hs" ? "#7aafc4" : p.group === "ms" ? "#c49a6c" : C.muted }} title="Cycle HS/MS/none">
+                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.02em" }}>{p.group ? p.group.toUpperCase() : "—"}</span>
+                    </button>
                     <button onClick={() => toggleType(p.id)} style={S.iconBtn} title="Toggle role"><RefreshCw size={13} /></button>
                     <button onClick={() => deactivate(p.id)} style={{ ...S.iconBtn, color: "#7a5040" }} title="Make inactive"><Trash2 size={13} /></button>
                   </div>
@@ -890,5 +938,10 @@ const S = {
   suggestTitle: { fontSize: 13, color: C.gold, margin: "0 0 10px", fontWeight: 500 },
   suggestList: { margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 6 },
   suggestItem: { fontSize: 12, color: C.muted, lineHeight: 1.5 },
-
+  // GROUP BADGES
+  badgeRow: { display: "flex", gap: 6, marginBottom: 14 },
+  hsBadge: { background: "#162533", color: "#7aafc4", border: "1px solid #7aafc433", marginBottom: 0 },
+  msBadge: { background: "#2a1e0a", color: "#c49a6c", border: "1px solid #c49a6c33", marginBottom: 0 },
+  hsBadgeSm: { background: "#162533", color: "#7aafc4" },
+  msBadgeSm: { background: "#2a1e0a", color: "#c49a6c" },
 };
