@@ -2,6 +2,22 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, Heart, Plus, Trash2, Upload, X, RefreshCw, BookOpen, RotateCcw, Cake } from "lucide-react";
 
 const STORAGE_KEY = "intercede-people-v2";
+const ADMIN_PASSWORD = "Promo1398!";
+const ADMIN_KEY = "intercede-admin-authed";
+const ADMIN_TTL = 86400000;
+
+function isAdminAuthed() {
+  try {
+    const raw = localStorage.getItem(ADMIN_KEY);
+    if (!raw) return false;
+    const { ts } = JSON.parse(raw);
+    return Date.now() - ts < ADMIN_TTL;
+  } catch { return false; }
+}
+
+function setAdminAuthed() {
+  localStorage.setItem(ADMIN_KEY, JSON.stringify({ ts: Date.now() }));
+}
 async function apiLoad() {
   const res = await fetch("/api/data");
   if (!res.ok) throw new Error("load failed");
@@ -242,6 +258,13 @@ export default function App() {
 
   const saveTimer = useRef(null);
 
+  // Admin auth
+  const [adminAuthed, setAdminAuthedState] = useState(() => isAdminAuthed());
+  const [showAdminPrompt, setShowAdminPrompt] = useState(false);
+  const [adminPwInput, setAdminPwInput] = useState("");
+  const [adminPwError, setAdminPwError] = useState("");
+  const [pendingView, setPendingView] = useState(null);
+
   useEffect(() => {
     const link = document.createElement("link");
     link.rel = "stylesheet";
@@ -419,6 +442,29 @@ export default function App() {
     setView("people");
   }
 
+  function handleTabClick(v) {
+    if ((v === "people" || v === "import") && !adminAuthed) {
+      setPendingView(v);
+      setAdminPwInput("");
+      setAdminPwError("");
+      setShowAdminPrompt(true);
+    } else {
+      setView(v);
+    }
+  }
+
+  function submitAdminPw() {
+    if (adminPwInput === ADMIN_PASSWORD) {
+      setAdminAuthed(true);
+      setAdminAuthedState(true);
+      setShowAdminPrompt(false);
+      if (pendingView) { setView(pendingView); setPendingView(null); }
+    } else {
+      setAdminPwError("Incorrect password.");
+      setAdminPwInput("");
+    }
+  }
+
   if (!loaded) {
     return <div style={S.root}><p style={{ color: "#c4a882", fontFamily: "Cormorant Garamond, serif", textAlign: "center", marginTop: 80, fontSize: 20 }}>Loading…</p></div>;
   }
@@ -449,10 +495,36 @@ export default function App() {
 
       {/* Tabs */}
       <nav style={S.tabs}>
-        {[["pray","Pray"],["week","Week"],["people","People"],["import","Import"]].map(([v, label]) => (
+        {[["pray","Pray"],["week","Week"]].map(([v, label]) => (
+          <button key={v} onClick={() => setView(v)} style={{ ...S.tab, ...(view === v ? S.tabActive : {}) }}>{label}</button>
+        ))}
+        {adminAuthed && [["people","People"],["import","Import"]].map(([v, label]) => (
           <button key={v} onClick={() => setView(v)} style={{ ...S.tab, ...(view === v ? S.tabActive : {}) }}>{label}</button>
         ))}
       </nav>
+
+      {/* Admin password modal */}
+      {showAdminPrompt && (
+        <div style={S.modalOverlay} onClick={() => setShowAdminPrompt(false)}>
+          <div style={S.modalBox} onClick={e => e.stopPropagation()}>
+            <p style={S.modalTitle}>Admin Access</p>
+            <input
+              autoFocus
+              type="password"
+              value={adminPwInput}
+              onChange={e => setAdminPwInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") submitAdminPw(); if (e.key === "Escape") setShowAdminPrompt(false); }}
+              placeholder="Password"
+              style={S.modalInput}
+            />
+            {adminPwError && <p style={S.modalError}>{adminPwError}</p>}
+            <div style={S.modalBtns}>
+              <button onClick={submitAdminPw} style={S.confirmBtn}>Unlock</button>
+              <button onClick={() => setShowAdminPrompt(false)} style={S.cancelBtn}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── PRAY ─── */}
       {view === "pray" && (
@@ -798,6 +870,13 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* Admin footer link */}
+      <div style={S.adminFooter}>
+        {adminAuthed
+          ? <button onClick={() => { setAdminAuthedState(false); localStorage.removeItem(ADMIN_KEY); setView("pray"); }} style={S.adminLink}>lock admin</button>
+          : <button onClick={() => { setAdminPwInput(""); setAdminPwError(""); setShowAdminPrompt(true); }} style={S.adminLink}>admin</button>
+        }
+      </div>
     </div>
   );
 }
@@ -938,6 +1017,16 @@ const S = {
   suggestTitle: { fontSize: 13, color: C.gold, margin: "0 0 10px", fontWeight: 500 },
   suggestList: { margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 6 },
   suggestItem: { fontSize: 12, color: C.muted, lineHeight: 1.5 },
+  // ADMIN FOOTER
+  adminFooter: { display: "flex", justifyContent: "center", padding: "12px 0 20px", marginTop: "auto" },
+  adminLink: { background: "none", border: "none", color: "#2e2518", fontSize: 11, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.06em" },
+  // MODAL
+  modalOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 },
+  modalBox: { background: "#1b1610", border: "1px solid #2e2518", borderRadius: 16, padding: "28px 24px", width: "100%", maxWidth: 320, display: "flex", flexDirection: "column", gap: 14 },
+  modalTitle: { fontFamily: "'Cormorant Garamond', serif", fontSize: 22, color: "#e2cfb0", margin: 0, textAlign: "center" },
+  modalInput: { background: "#0e0c09", border: "1px solid #2e2518", borderRadius: 10, color: "#e2cfb0", padding: "12px 14px", fontSize: 16, fontFamily: "'DM Sans', sans-serif", outline: "none", textAlign: "center", letterSpacing: "0.08em" },
+  modalError: { fontSize: 12, color: "#c07070", margin: 0, textAlign: "center" },
+  modalBtns: { display: "flex", gap: 8 },
   // GROUP BADGES
   badgeRow: { display: "flex", gap: 6, marginBottom: 14 },
   hsBadge: { background: "#162533", color: "#7aafc4", border: "1px solid #7aafc433", marginBottom: 0 },
