@@ -1,0 +1,867 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import { ChevronLeft, ChevronRight, Heart, Plus, Trash2, Upload, X, RefreshCw, BookOpen, RotateCcw, Cake } from "lucide-react";
+
+const STORAGE_KEY = "intercede-people-v2";
+
+function genId() {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+function withinWeek(ts) {
+  return ts && Date.now() - ts < 7 * 24 * 60 * 60 * 1000;
+}
+
+function timeAgo(ts) {
+  if (!ts) return null;
+  const diff = Date.now() - ts;
+  const days = Math.floor(diff / 86400000);
+  if (days === 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days} days ago`;
+  return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function getBirthdayStatus(birthday) {
+  if (!birthday) return null;
+  const today = new Date();
+  const [month, day] = birthday.split("-").map(Number);
+  if (!month || !day) return null;
+  let bday = new Date(today.getFullYear(), month - 1, day);
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (bday < todayMidnight) bday = new Date(today.getFullYear() + 1, month - 1, day);
+  const diff = Math.round((bday - todayMidnight) / 86400000);
+  if (diff === 0) return { label: "🎂 Birthday today!", urgent: true };
+  if (diff === 1) return { label: "🎂 Birthday tomorrow!", urgent: true };
+  if (diff <= 7) return { label: `🎂 Birthday in ${diff} days`, urgent: false };
+  return null;
+}
+
+function formatBirthday(birthday) {
+  if (!birthday) return "";
+  const [month, day] = birthday.split("-").map(Number);
+  if (!month || !day) return birthday;
+  return new Date(2000, month - 1, day).toLocaleDateString("en-US", { month: "long", day: "numeric" });
+}
+
+function getUpcomingBirthdays(people) {
+  const today = new Date();
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const results = [];
+  for (const p of people) {
+    if (!p.birthday) continue;
+    const [month, day] = p.birthday.split("-").map(Number);
+    if (!month || !day) continue;
+    let bday = new Date(today.getFullYear(), month - 1, day);
+    if (bday < todayMidnight) bday = new Date(today.getFullYear() + 1, month - 1, day);
+    const diff = Math.round((bday - todayMidnight) / 86400000);
+    if (diff <= 30) results.push({ person: p, diff, date: bday });
+  }
+  return results.sort((a, b) => a.diff - b.diff);
+}
+
+// ── CSV parsing helpers ────────────────────────────────────
+
+// Parse a single CSV line, respecting quoted fields
+function splitCSVLine(line) {
+  const cells = [];
+  let cur = "", inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') { inQ = !inQ; }
+    else if (ch === ',' && !inQ) { cells.push(cur.trim()); cur = ""; }
+    else { cur += ch; }
+  }
+  cells.push(cur.trim());
+  return cells.map(c => c.replace(/^["']|["']$/g, "").trim());
+}
+
+function titleCase(str) {
+  return str.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+}
+
+// If "Smith, John" → "John Smith"; also title-cases
+function normalizeName(raw) {
+  const trimmed = raw.trim();
+  const commaFlip = trimmed.match(/^([^,]+),\s*(.+)$/);
+  if (commaFlip) return titleCase(`${commaFlip[2].trim()} ${commaFlip[1].trim()}`);
+  return titleCase(trimmed);
+}
+
+// Parse a birthday string into MM-DD format
+function parseBirthdayStr(raw) {
+  if (!raw) return "";
+  const cleaned = raw.trim();
+  // numeric: 03/15, 3-15, 03/15/2005, etc.
+  const numeric = cleaned.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-]\d{2,4})?$/);
+  if (numeric) return `${numeric[1].padStart(2, "0")}-${numeric[2].padStart(2, "0")}`;
+  // month name: "March 15", "15 March", "March 15, 2005"
+  const months = ["january","february","march","april","may","june","july","august","september","october","november","december"];
+  const lower = cleaned.toLowerCase();
+  for (let mi = 0; mi < months.length; mi++) {
+    if (lower.includes(months[mi])) {
+      const dayMatch = cleaned.match(/\b(\d{1,2})\b/);
+      if (dayMatch) return `${String(mi + 1).padStart(2, "0")}-${dayMatch[1].padStart(2, "0")}`;
+    }
+  }
+  return "";
+}
+
+function parseCSV(text) {
+  const rawLines = text.trim().split(/\r?\n/).filter(l => l.trim());
+  if (!rawLines.length) return [];
+
+  const firstCells = splitCSVLine(rawLines[0]);
+  const firstNorm = firstCells.map(c => c.toLowerCase().replace(/[^a-z]/g, ""));
+
+  // Detect header row by looking for name/date keywords
+  const nameKws = ["name","first","last","fname","lname","given","surname","family","student","person","contact"];
+  const hasHeader = firstNorm.some(c => nameKws.some(kw => c.includes(kw)));
+
+  const headers = hasHeader ? firstNorm : [];
+  const dataLines = hasHeader ? rawLines.slice(1) : rawLines;
+
+  // Locate name columns
+  const firstNameIdx = headers.findIndex(h =>
+    h === "firstname" || h === "fname" || h === "givenname" || h === "given" ||
+    h === "first" || h.startsWith("first")
+  );
+  const lastNameIdx = headers.findIndex(h =>
+    h === "lastname" || h === "lname" || h === "surname" || h === "familyname" ||
+    h === "last" || h.startsWith("last") || h === "family"
+  );
+  const fullNameIdx = (firstNameIdx < 0 && lastNameIdx < 0)
+    ? headers.findIndex(h => h.includes("name") || h.includes("student") || h.includes("person") || h.includes("contact"))
+    : -1;
+
+  // Locate birthday column
+  const bdayIdx = headers.findIndex(h =>
+    h.includes("birth") || h.includes("bday") || h.includes("dob") || h === "bd" || h === "birthday"
+  );
+
+  // For headerless files, sniff which column looks like a date
+  const fallbackBdayIdx = (() => {
+    if (hasHeader || !dataLines.length) return -1;
+    const sample = splitCSVLine(dataLines[0]);
+    for (let i = 1; i < sample.length; i++) {
+      if (parseBirthdayStr(sample[i])) return i;
+    }
+    return -1;
+  })();
+
+  return dataLines.map(line => {
+    const cells = splitCSVLine(line);
+    if (!cells.length || !cells[0]) return null;
+
+    let name = "";
+    if (hasHeader) {
+      if (firstNameIdx >= 0 && lastNameIdx >= 0) {
+        // Separate first + last columns → join as "First Last"
+        const first = (cells[firstNameIdx] || "").trim();
+        const last = (cells[lastNameIdx] || "").trim();
+        name = titleCase(`${first} ${last}`.trim());
+      } else if (firstNameIdx >= 0) {
+        name = titleCase((cells[firstNameIdx] || "").trim());
+      } else if (lastNameIdx >= 0) {
+        name = titleCase((cells[lastNameIdx] || "").trim());
+      } else if (fullNameIdx >= 0) {
+        name = normalizeName(cells[fullNameIdx] || "");
+      } else {
+        // No recognized column — fall back to first cell
+        name = normalizeName(cells[0] || "");
+      }
+    } else {
+      name = normalizeName(cells[0] || "");
+    }
+
+    if (!name || name.length < 2) return null;
+
+    const bi = hasHeader ? bdayIdx : fallbackBdayIdx;
+    const birthday = bi >= 0 && cells[bi] ? parseBirthdayStr(cells[bi]) : "";
+
+    return { name, birthday };
+  }).filter(Boolean);
+}
+
+// ── Component ──────────────────────────────────────────────
+
+export default function App() {
+  const [people, setPeople] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const [view, setView] = useState("pray");
+  const [order, setOrder] = useState("random");
+  const [filter, setFilter] = useState("all");
+  const [cardIdx, setCardIdx] = useState(0);
+  const [deckIds, setDeckIds] = useState([]);
+
+  // Swipe
+  const touchStartX = useRef(null);
+  const touchStartY = useRef(null);
+  const [swipeDelta, setSwipeDelta] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+
+  // People mgmt
+  const [addName, setAddName] = useState("");
+  const [addType, setAddType] = useState("student");
+  const [search, setSearch] = useState("");
+  const [editBdayFor, setEditBdayFor] = useState(null);
+  const [bdayInput, setBdayInput] = useState("");
+
+  // Prayer requests
+  const [reqFor, setReqFor] = useState(null);
+  const [reqText, setReqText] = useState("");
+
+  // Import
+  const [importData, setImportData] = useState(null);
+  const fileRef = useRef(null);
+
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap";
+    document.head.appendChild(link);
+    return () => link.remove();
+  }, []);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("intercede-people-v1");
+      if (saved) setPeople(JSON.parse(saved));
+    } catch {}
+    setLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!loaded) return;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(people)); } catch {}
+  }, [people, loaded]);
+
+  const activePeople = people.filter(p => p.active !== false);
+
+  const getFiltered = useCallback(() => {
+    let list = activePeople;
+    if (filter === "students") list = list.filter(p => p.type === "student");
+    if (filter === "leaders") list = list.filter(p => p.type === "leader");
+    if (filter === "unprayed") list = list.filter(p => !withinWeek(p.prayedAt));
+    return list;
+  }, [people, filter]);
+
+  const buildDeck = useCallback((filterOverride) => {
+    const f = filterOverride ?? filter;
+    let list = activePeople;
+    if (f === "students") list = list.filter(p => p.type === "student");
+    if (f === "leaders") list = list.filter(p => p.type === "leader");
+    if (f === "unprayed") list = list.filter(p => !withinWeek(p.prayedAt));
+    setDeckIds(shuffle(list.map(p => p.id)));
+    setCardIdx(0);
+  }, [people, filter]);
+
+  useEffect(() => { if (loaded) buildDeck(); }, [loaded, filter]);
+
+  const deck = (() => {
+    if (order === "alpha") return getFiltered().slice().sort((a, b) => a.name.localeCompare(b.name));
+    const map = Object.fromEntries(activePeople.map(p => [p.id, p]));
+    return deckIds.map(id => map[id]).filter(Boolean);
+  })();
+
+  const current = deck[cardIdx] ?? null;
+  const prayedCount = activePeople.filter(p => withinWeek(p.prayedAt)).length;
+  const upcomingBdays = getUpcomingBirthdays(activePeople);
+  const urgentBdays = upcomingBdays.filter(b => b.diff <= 3).length;
+
+  function nav(dir) {
+    setReqFor(null);
+    setSwipeDelta(0);
+    setCardIdx(i => {
+      let n = i + dir;
+      if (n < 0) n = deck.length - 1;
+      if (n >= deck.length) n = 0;
+      return n;
+    });
+  }
+
+  function handleTouchStart(e) {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    setIsSwiping(false);
+    setSwipeDelta(0);
+  }
+
+  function handleTouchMove(e) {
+    if (touchStartX.current === null) return;
+    const dx = e.touches[0].clientX - touchStartX.current;
+    const dy = e.touches[0].clientY - touchStartY.current;
+    if (!isSwiping && Math.abs(dy) > Math.abs(dx)) return;
+    setIsSwiping(true);
+    e.preventDefault();
+    setSwipeDelta(dx);
+  }
+
+  function handleTouchEnd() {
+    if (Math.abs(swipeDelta) > 55) nav(swipeDelta < 0 ? 1 : -1);
+    else setSwipeDelta(0);
+    setIsSwiping(false);
+    touchStartX.current = null;
+    touchStartY.current = null;
+  }
+
+  function markPrayed() {
+    if (!current) return;
+    setPeople(prev => prev.map(p => p.id === current.id ? { ...p, prayedAt: Date.now() } : p));
+  }
+
+  function unmarkPrayed() {
+    if (!current) return;
+    setPeople(prev => prev.map(p => p.id === current.id ? { ...p, prayedAt: null } : p));
+  }
+
+  function addPerson() {
+    if (!addName.trim()) return;
+    setPeople(prev => [...prev, { id: genId(), name: addName.trim(), type: addType, active: true, prayedAt: null, prayerRequests: [], birthday: "" }]);
+    setAddName("");
+  }
+
+  function toggleType(id) {
+    setPeople(prev => prev.map(p => p.id === id ? { ...p, type: p.type === "student" ? "leader" : "student" } : p));
+  }
+
+  function deactivate(id) { setPeople(prev => prev.map(p => p.id === id ? { ...p, active: false } : p)); }
+  function restore(id) { setPeople(prev => prev.map(p => p.id === id ? { ...p, active: true } : p)); }
+  function deletePerm(id) { setPeople(prev => prev.filter(p => p.id !== id)); }
+
+  function saveBirthday(id, val) {
+    setPeople(prev => prev.map(p => p.id === id ? { ...p, birthday: val } : p));
+    setEditBdayFor(null);
+    setBdayInput("");
+  }
+
+  function addRequest(personId) {
+    if (!reqText.trim()) return;
+    setPeople(prev => prev.map(p => p.id === personId ? { ...p, prayerRequests: [...(p.prayerRequests || []), reqText.trim()] } : p));
+    setReqText(""); setReqFor(null);
+  }
+
+  function removeRequest(personId, idx) {
+    setPeople(prev => prev.map(p => p.id === personId ? { ...p, prayerRequests: p.prayerRequests.filter((_, i) => i !== idx) } : p));
+  }
+
+  function handleFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => setImportData(parseCSV(ev.target.result));
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+
+  function confirmImport() {
+    const existing = new Set(people.map(p => p.name.toLowerCase()));
+    const toAdd = (importData || [])
+      .filter(p => !existing.has(p.name.toLowerCase()))
+      .map(p => ({ id: genId(), name: p.name, type: "student", active: true, prayedAt: null, prayerRequests: [], birthday: p.birthday || "" }));
+    setPeople(prev => [...prev, ...toAdd]);
+    setImportData(null);
+    setView("people");
+  }
+
+  if (!loaded) {
+    return <div style={S.root}><p style={{ color: "#c4a882", fontFamily: "Cormorant Garamond, serif", textAlign: "center", marginTop: 80, fontSize: 20 }}>Loading…</p></div>;
+  }
+
+  const bdayStatus = current ? getBirthdayStatus(current.birthday) : null;
+  const prayedThis = activePeople.filter(p => withinWeek(p.prayedAt)).sort((a, b) => b.prayedAt - a.prayedAt);
+  const notPrayedThis = activePeople.filter(p => !withinWeek(p.prayedAt)).sort((a, b) => a.name.localeCompare(b.name));
+
+  return (
+    <div style={S.root}>
+      {/* Header */}
+      <header style={S.header}>
+        <div style={S.logoWrap}>
+          <span style={S.logoCross}>✦</span>
+          <span style={S.logoText}>Intercede</span>
+        </div>
+        <div style={S.weekBar}>
+          <Heart size={13} color="#d4916a" fill="#d4916a" />
+          <span style={S.weekText}>{prayedCount} / {activePeople.length} this week</span>
+          {urgentBdays > 0 && <span style={S.bdayAlert}>🎂 {urgentBdays}</span>}
+        </div>
+      </header>
+
+      {/* Progress */}
+      <div style={S.progressTrack}>
+        <div style={{ ...S.progressFill, width: activePeople.length ? `${(prayedCount / activePeople.length) * 100}%` : "0%" }} />
+      </div>
+
+      {/* Tabs */}
+      <nav style={S.tabs}>
+        {[["pray","Pray"],["week","Week"],["people","People"],["import","Import"]].map(([v, label]) => (
+          <button key={v} onClick={() => setView(v)} style={{ ...S.tab, ...(view === v ? S.tabActive : {}) }}>{label}</button>
+        ))}
+      </nav>
+
+      {/* ─── PRAY ─── */}
+      {view === "pray" && (
+        <div style={S.prayWrap}>
+          <div style={S.controls}>
+            <div style={S.togglePill}>
+              <button onClick={() => { setOrder("random"); buildDeck(); }} style={{ ...S.toggleOpt, ...(order === "random" ? S.toggleOptOn : {}) }}>Shuffle</button>
+              <button onClick={() => { setOrder("alpha"); setCardIdx(0); }} style={{ ...S.toggleOpt, ...(order === "alpha" ? S.toggleOptOn : {}) }}>A–Z</button>
+            </div>
+            <select value={filter} onChange={e => { setFilter(e.target.value); setCardIdx(0); }} style={S.filterSelect}>
+              <option value="all">Everyone</option>
+              <option value="students">Students</option>
+              <option value="leaders">Leaders</option>
+              <option value="unprayed">Unprayed</option>
+            </select>
+            {order === "random" && (
+              <button onClick={() => buildDeck()} style={S.reshuffleBtn} title="Reshuffle"><RotateCcw size={14} /></button>
+            )}
+          </div>
+
+          {deck.length === 0 ? (
+            <div style={S.empty}>
+              <BookOpen size={40} color="#5a4832" />
+              <p style={S.emptyTitle}>No one here yet</p>
+              <p style={S.emptySub}>Add people in the People tab or import a CSV.</p>
+            </div>
+          ) : (
+            <>
+              <div style={S.swipeHint}>← swipe to navigate →</div>
+
+              <div style={S.cardOuter} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+                <div style={{ ...S.cardGhost, transform: "rotate(2deg) translateY(6px)", opacity: 0.35 }} />
+                <div style={{ ...S.cardGhost, transform: "rotate(-1.5deg) translateY(3px)", opacity: 0.55 }} />
+                <div style={{
+                  ...S.card,
+                  ...(withinWeek(current?.prayedAt) ? S.cardDone : {}),
+                  transform: isSwiping ? `translateX(${swipeDelta * 0.35}px) rotate(${swipeDelta * 0.018}deg)` : "none",
+                  transition: isSwiping ? "none" : "transform 0.25s cubic-bezier(.25,.46,.45,.94)",
+                  opacity: isSwiping ? Math.max(0.6, 1 - Math.abs(swipeDelta) / 400) : 1,
+                }}>
+                  <div style={{ ...S.badge, ...(current?.type === "leader" ? S.leaderBadge : S.studentBadge) }}>
+                    {current?.type === "leader" ? "Leader" : "Student"}
+                  </div>
+                  <h2 style={S.cardName}>{current?.name}</h2>
+
+                  {bdayStatus && (
+                    <div style={{ ...S.bdayChip, ...(bdayStatus.urgent ? S.bdayChipUrgent : {}) }}>{bdayStatus.label}</div>
+                  )}
+                  {current?.birthday && !bdayStatus && (
+                    <div style={S.bdayQuiet}><Cake size={11} style={{ marginRight: 5, opacity: 0.5 }} />{formatBirthday(current.birthday)}</div>
+                  )}
+
+                  <div style={S.cardPrayedRow}>
+                    {withinWeek(current?.prayedAt) ? (
+                      <span style={S.prayedChip}>✓ Prayed {timeAgo(current.prayedAt)}</span>
+                    ) : current?.prayedAt ? (
+                      <span style={S.lastPrayedChip}>Last: {timeAgo(current.prayedAt)}</span>
+                    ) : (
+                      <span style={S.neverChip}>Not yet prayed for</span>
+                    )}
+                  </div>
+
+                  {(current?.prayerRequests || []).length > 0 && (
+                    <div style={S.reqBox}>
+                      <p style={S.reqLabel}>Prayer Requests</p>
+                      {current.prayerRequests.map((req, i) => (
+                        <div key={i} style={S.reqItem}>
+                          <span style={S.reqDot}>◆</span>
+                          <span style={S.reqText}>{req}</span>
+                          <button onClick={() => removeRequest(current.id, i)} style={S.reqRemove}><X size={11} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {reqFor === current?.id ? (
+                    <div style={S.reqInputRow}>
+                      <input autoFocus value={reqText} onChange={e => setReqText(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") addRequest(current.id); if (e.key === "Escape") setReqFor(null); }}
+                        placeholder="Enter prayer request…" style={S.reqInput} />
+                      <button onClick={() => addRequest(current.id)} style={S.reqAddBtn}>Add</button>
+                      <button onClick={() => setReqFor(null)} style={S.reqCancelBtn}><X size={13} /></button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setReqFor(current?.id)} style={S.addReqTrigger}>
+                      <Plus size={13} style={{ marginRight: 4 }} /> Add Request
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div style={S.navRow}>
+                <button onClick={() => nav(-1)} style={S.navArrow}><ChevronLeft size={22} /></button>
+                <span style={S.counter}>{cardIdx + 1} <span style={{ color: "#5a4832" }}>/</span> {deck.length}</span>
+                <button onClick={() => nav(1)} style={S.navArrow}><ChevronRight size={22} /></button>
+              </div>
+
+              {withinWeek(current?.prayedAt) ? (
+                <div style={S.prayedActions}>
+                  <div style={S.prayedConfirm}><Heart size={16} fill="#9dc88d" color="#9dc88d" style={{ marginRight: 7 }} /> Prayed!</div>
+                  <button onClick={unmarkPrayed} style={S.undoBtn}>Undo</button>
+                </div>
+              ) : (
+                <button onClick={markPrayed} style={S.prayBtn}>
+                  <Heart size={16} style={{ marginRight: 8 }} /> Mark as Prayed
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ─── WEEK SUMMARY ─── */}
+      {view === "week" && (
+        <div style={S.weekWrap}>
+          <h2 style={S.weekTitle}>This Week</h2>
+
+          {upcomingBdays.length > 0 && (
+            <div style={S.weekSection}>
+              <div style={S.sectionHead}>
+                <Cake size={13} color={C.gold} style={{ marginRight: 7 }} />
+                <span style={S.sectionTitle}>Upcoming Birthdays</span>
+              </div>
+              {upcomingBdays.map(({ person, diff, date }) => (
+                <div key={person.id} style={{ ...S.weekRow, ...(diff === 0 ? { background: "#1e1608" } : {}) }}>
+                  <div>
+                    <div style={S.weekName}>{person.name}</div>
+                    <div style={S.weekMeta}>{diff === 0 ? "🎉 Today!" : diff === 1 ? "Tomorrow" : date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
+                  </div>
+                  <span style={{ ...S.badgeSm, ...(person.type === "leader" ? S.leaderBadgeSm : S.studentBadgeSm) }}>{person.type}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={S.weekSection}>
+            <div style={S.sectionHead}>
+              <Heart size={13} fill={C.prayedGreen} color={C.prayedGreen} style={{ marginRight: 7 }} />
+              <span style={S.sectionTitle}>Prayed For — {prayedThis.length}</span>
+            </div>
+            {prayedThis.length === 0
+              ? <p style={S.weekEmpty}>No one marked yet this week.</p>
+              : prayedThis.map(p => (
+                <div key={p.id} style={S.weekRow}>
+                  <div>
+                    <div style={S.weekName}>{p.name}</div>
+                    <div style={S.weekMeta}>{timeAgo(p.prayedAt)}</div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {(p.prayerRequests || []).length > 0 && <span style={S.reqCountBadge}>{p.prayerRequests.length} req</span>}
+                    <span style={{ color: C.prayedGreen, fontSize: 18 }}>✓</span>
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+
+          <div style={S.weekSection}>
+            <div style={S.sectionHead}>
+              <div style={{ width: 13, height: 13, borderRadius: "50%", border: `1.5px solid ${C.muted}`, marginRight: 7, flexShrink: 0 }} />
+              <span style={S.sectionTitle}>Still Waiting — {notPrayedThis.length}</span>
+            </div>
+            {notPrayedThis.length === 0 ? (
+              <div style={S.allPrayedBanner}>
+                <Heart size={22} fill={C.gold} color={C.gold} />
+                <span style={S.allPrayedText}>Everyone prayed for this week!</span>
+              </div>
+            ) : notPrayedThis.map(p => (
+              <div key={p.id} style={S.weekRow}>
+                <div>
+                  <div style={{ ...S.weekName, color: C.muted }}>{p.name}</div>
+                  {p.prayedAt && <div style={S.weekMeta}>Last: {timeAgo(p.prayedAt)}</div>}
+                </div>
+                <span style={{ ...S.badgeSm, ...(p.type === "leader" ? S.leaderBadgeSm : S.studentBadgeSm) }}>{p.type}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ─── PEOPLE ─── */}
+      {view === "people" && (
+        <div style={S.peopleWrap}>
+          <div style={S.addRow}>
+            <input value={addName} onChange={e => setAddName(e.target.value)} onKeyDown={e => e.key === "Enter" && addPerson()} placeholder="Full name" style={S.addInput} />
+            <select value={addType} onChange={e => setAddType(e.target.value)} style={S.addTypeSelect}>
+              <option value="student">Student</option>
+              <option value="leader">Leader</option>
+            </select>
+            <button onClick={addPerson} style={S.addPersonBtn}><Plus size={16} /></button>
+          </div>
+
+          <div style={S.statRow}>
+            {[[`${activePeople.length}`, "total"], [`${activePeople.filter(p => p.type === "student").length}`, "students"], [`${activePeople.filter(p => p.type === "leader").length}`, "leaders"], [`${prayedCount}`, "prayed ✓"]].map(([n, l]) => (
+              <div key={l} style={S.statChip}><span style={S.statNum}>{n}</span><span style={S.statLbl}>{l}</span></div>
+            ))}
+          </div>
+
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search people…" style={{ ...S.addInput, marginBottom: 4 }} />
+
+          <div style={S.personList}>
+            {activePeople.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)).map(p => (
+              <div key={p.id} style={S.personCard}>
+                <div style={S.personRow}>
+                  <div style={S.personLeft}>
+                    <span style={S.personName}>{p.name}</span>
+                    <div style={S.personMeta}>
+                      <span style={{ ...S.badgeSm, ...(p.type === "leader" ? S.leaderBadgeSm : S.studentBadgeSm) }}>{p.type}</span>
+                      {withinWeek(p.prayedAt) && <span style={S.prayedSmall}>✓ prayed</span>}
+                      {(p.prayerRequests || []).length > 0 && <span style={S.reqCountBadge}>{p.prayerRequests.length} req</span>}
+                      {p.birthday && <span style={S.bdayBadgeSm}><Cake size={9} style={{ marginRight: 3 }} />{formatBirthday(p.birthday)}</span>}
+                    </div>
+                  </div>
+                  <div style={S.personActions}>
+                    <button onClick={() => { setEditBdayFor(editBdayFor === p.id ? null : p.id); setBdayInput(p.birthday || ""); }}
+                      style={{ ...S.iconBtn, color: p.birthday ? C.gold : C.muted }} title="Set birthday"><Cake size={13} /></button>
+                    <button onClick={() => toggleType(p.id)} style={S.iconBtn} title="Toggle role"><RefreshCw size={13} /></button>
+                    <button onClick={() => deactivate(p.id)} style={{ ...S.iconBtn, color: "#7a5040" }} title="Make inactive"><Trash2 size={13} /></button>
+                  </div>
+                </div>
+                {editBdayFor === p.id && (
+                  <div style={S.bdayEditRow}>
+                    <Cake size={13} style={{ color: C.gold, flexShrink: 0 }} />
+                    <input autoFocus value={bdayInput} onChange={e => setBdayInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") saveBirthday(p.id, parseBirthdayStr(bdayInput)); if (e.key === "Escape") setEditBdayFor(null); }}
+                      placeholder="MM-DD  e.g. 03-15" style={S.bdayInput} />
+                    <button onClick={() => saveBirthday(p.id, parseBirthdayStr(bdayInput))} style={S.reqAddBtn}>Save</button>
+                    {p.birthday && <button onClick={() => saveBirthday(p.id, "")} style={S.reqCancelBtn} title="Clear"><X size={12} /></button>}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {people.filter(p => p.active === false).length > 0 && (
+            <div style={S.inactiveSection}>
+              <p style={S.inactiveHeading}>Inactive</p>
+              {people.filter(p => p.active === false).map(p => (
+                <div key={p.id} style={S.inactiveRow}>
+                  <span style={S.inactiveName}>{p.name}</span>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => restore(p.id)} style={S.restoreBtn}>Restore</button>
+                    <button onClick={() => deletePerm(p.id)} style={S.deleteBtn}>Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── IMPORT ─── */}
+      {view === "import" && (
+        <div style={S.importWrap}>
+          <h3 style={S.importTitle}>Import CSV</h3>
+          <p style={S.importDesc}>
+            Just export whatever roster you already have. The importer only looks for name and birthday columns — everything else is ignored.
+          </p>
+
+          <div style={S.importRulesBox}>
+            <div style={S.importRule}>
+              <span style={S.importRuleIcon}>👤</span>
+              <div>
+                <strong style={{ color: C.cream }}>Names</strong> — recognizes columns like <code style={S.code}>Name</code>, <code style={S.code}>First Name</code>, <code style={S.code}>Last Name</code>, <code style={S.code}>Student</code>. Separate first/last columns are joined automatically. "Smith, John" format is flipped to "John Smith".
+              </div>
+            </div>
+            <div style={S.importRule}>
+              <span style={S.importRuleIcon}>🎂</span>
+              <div>
+                <strong style={{ color: C.cream }}>Birthdays</strong> — recognizes <code style={S.code}>Birthday</code>, <code style={S.code}>DOB</code>, <code style={S.code}>Birthdate</code>. Accepts MM/DD, MM-DD, or "March 15".
+              </div>
+            </div>
+            <div style={S.importRule}>
+              <span style={S.importRuleIcon}>📋</span>
+              <div>All imported people start as <strong style={{ color: C.cream }}>Students</strong>. Change roles in the People tab after importing.</div>
+            </div>
+          </div>
+
+          <pre style={S.csvPreview}>{`Last Name,First Name,Grade,Email,DOB\nSmith,John,10,j@school.edu,03/15\nLee,Sarah,11,s@school.edu,11-02\nBrown,Mike,9,,`}</pre>
+          <p style={S.importNote}>Above: a messy real-world export — Grade and Email columns are simply ignored.</p>
+
+          <button onClick={() => fileRef.current.click()} style={S.uploadBtn}>
+            <Upload size={16} style={{ marginRight: 8 }} /> Choose File
+          </button>
+          <input ref={fileRef} type="file" accept=".csv,.txt" onChange={handleFile} style={{ display: "none" }} />
+
+          {importData && (
+            <div style={S.previewBox}>
+              <p style={S.previewTitle}>Preview — {importData.length} people found</p>
+              <div style={S.previewScroll}>
+                {importData.slice(0, 12).map((p, i) => (
+                  <div key={i} style={S.previewRow}>
+                    <span style={S.previewName}>{p.name}</span>
+                    {p.birthday
+                      ? <span style={S.bdayBadgeSm}><Cake size={9} style={{ marginRight: 3 }} />{formatBirthday(p.birthday)}</span>
+                      : <span style={{ fontSize: 11, color: C.faint }}>no birthday</span>
+                    }
+                  </div>
+                ))}
+                {importData.length > 12 && <p style={S.moreText}>and {importData.length - 12} more</p>}
+              </div>
+              <div style={S.previewBtnRow}>
+                <button onClick={confirmImport} style={S.confirmBtn}>Import All</button>
+                <button onClick={() => setImportData(null)} style={S.cancelBtn}>Cancel</button>
+              </div>
+            </div>
+          )}
+
+          <div style={S.suggestBox}>
+            <p style={S.suggestTitle}>💡 Still on the roadmap</p>
+            <ul style={S.suggestList}>
+              {["Prayer streak — consecutive weeks praying for everyone", "Prayer history log — timestamped journal per person", "Groups — organize by small group, grade, or team", "Notes field — free-form notes per person", "Completed requests — mark a request answered and archive it"].map((s, i) => (
+                <li key={i} style={S.suggestItem}>{s}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Colors ─────────────────────────────────────────────── */
+const C = {
+  bg: "#0e0c09", surface: "#1b1610", card: "#231d14", border: "#2e2518",
+  gold: "#c9982a", goldLight: "#e8b84b", cream: "#e2cfb0", muted: "#7d6a52", faint: "#3d3226",
+  student: "#4e84a0", studentBg: "#162533", leader: "#72966a", leaderBg: "#182115",
+  prayedGreen: "#8fc47f", prayedBg: "#131e10",
+};
+
+/* ── Styles ─────────────────────────────────────────────── */
+const S = {
+  root: { minHeight: "100vh", background: C.bg, color: C.cream, fontFamily: "'DM Sans', sans-serif", fontSize: 14, maxWidth: 480, margin: "0 auto", display: "flex", flexDirection: "column" },
+  header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 20px 0" },
+  logoWrap: { display: "flex", alignItems: "center", gap: 8 },
+  logoCross: { fontSize: 18, color: C.gold },
+  logoText: { fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: C.cream, letterSpacing: "0.04em" },
+  weekBar: { display: "flex", alignItems: "center", gap: 6, background: "#1f1810", border: `1px solid ${C.border}`, borderRadius: 20, padding: "5px 12px" },
+  weekText: { fontSize: 12, color: C.muted },
+  bdayAlert: { fontSize: 11, background: "#2a1e08", color: C.gold, borderRadius: 10, padding: "1px 6px" },
+  progressTrack: { margin: "14px 20px 0", height: 3, background: C.faint, borderRadius: 2, overflow: "hidden" },
+  progressFill: { height: "100%", background: `linear-gradient(90deg, ${C.gold}, ${C.goldLight})`, borderRadius: 2, transition: "width 0.6s ease" },
+  tabs: { display: "flex", borderBottom: `1px solid ${C.border}`, margin: "14px 0 0" },
+  tab: { flex: 1, background: "none", border: "none", color: C.muted, padding: "10px 0", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 400, letterSpacing: "0.04em", transition: "color 0.2s" },
+  tabActive: { color: C.goldLight, borderBottom: `2px solid ${C.gold}`, marginBottom: -1, fontWeight: 500 },
+  // PRAY
+  prayWrap: { flex: 1, display: "flex", flexDirection: "column", padding: "16px 20px 28px" },
+  controls: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10 },
+  togglePill: { display: "flex", background: C.faint, borderRadius: 20, padding: 2 },
+  toggleOpt: { background: "none", border: "none", color: C.muted, padding: "5px 14px", borderRadius: 18, cursor: "pointer", fontSize: 12, fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s" },
+  toggleOptOn: { background: C.surface, color: C.cream, fontWeight: 500 },
+  filterSelect: { background: C.faint, border: `1px solid ${C.border}`, color: C.muted, borderRadius: 20, padding: "5px 12px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", outline: "none", flex: 1 },
+  reshuffleBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 20, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 },
+  swipeHint: { fontSize: 11, color: "#3a3020", textAlign: "center", marginBottom: 8, letterSpacing: "0.05em" },
+  empty: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, paddingBottom: 60 },
+  emptyTitle: { fontFamily: "'Cormorant Garamond', serif", fontSize: 22, color: C.muted, margin: 0 },
+  emptySub: { fontSize: 13, color: C.faint, margin: 0, textAlign: "center" },
+  cardOuter: { position: "relative", margin: "0 0 20px", touchAction: "pan-y" },
+  cardGhost: { position: "absolute", inset: 0, background: C.card, borderRadius: 18, border: `1px solid ${C.border}` },
+  card: { position: "relative", background: C.card, border: `1px solid ${C.border}`, borderRadius: 18, padding: "28px 24px 22px", display: "flex", flexDirection: "column", gap: 0, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", userSelect: "none" },
+  cardDone: { background: C.prayedBg, borderColor: "#2a3d24" },
+  badge: { display: "inline-flex", alignSelf: "flex-start", padding: "3px 11px", borderRadius: 12, fontSize: 11, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 14 },
+  studentBadge: { background: C.studentBg, color: C.student, border: `1px solid ${C.student}33` },
+  leaderBadge: { background: C.leaderBg, color: C.leader, border: `1px solid ${C.leader}33` },
+  cardName: { fontFamily: "'Cormorant Garamond', serif", fontSize: 40, fontWeight: 400, lineHeight: 1.1, color: C.cream, margin: "0 0 10px" },
+  bdayChip: { display: "inline-flex", alignItems: "center", background: "#221a08", border: `1px solid #5a3e10`, color: C.gold, borderRadius: 10, padding: "4px 10px", fontSize: 12, marginBottom: 10 },
+  bdayChipUrgent: { background: "#2e1e04", borderColor: C.gold, color: C.goldLight, fontWeight: 500 },
+  bdayQuiet: { display: "flex", alignItems: "center", fontSize: 11, color: "#4a3e2a", marginBottom: 8 },
+  cardPrayedRow: { marginBottom: 18 },
+  prayedChip: { fontSize: 12, color: C.prayedGreen, background: "#1a2e18", padding: "3px 10px", borderRadius: 10 },
+  lastPrayedChip: { fontSize: 12, color: C.muted },
+  neverChip: { fontSize: 12, color: "#5a4a3a", fontStyle: "italic" },
+  reqBox: { background: "#1a150e", borderRadius: 10, padding: "12px 14px", marginBottom: 14 },
+  reqLabel: { fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 8px" },
+  reqItem: { display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 6 },
+  reqDot: { color: C.gold, fontSize: 8, marginTop: 3, flexShrink: 0 },
+  reqText: { flex: 1, fontSize: 13, color: "#c4b090", lineHeight: 1.4 },
+  reqRemove: { background: "none", border: "none", color: "#5a4832", cursor: "pointer", padding: 2, display: "flex", flexShrink: 0 },
+  reqInputRow: { display: "flex", gap: 6, alignItems: "center", marginTop: 4 },
+  reqInput: { flex: 1, background: "#1a150e", border: `1px solid ${C.border}`, borderRadius: 8, color: C.cream, padding: "7px 10px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none" },
+  reqAddBtn: { background: C.gold, border: "none", color: "#0e0c09", borderRadius: 8, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  reqCancelBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+  addReqTrigger: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", alignSelf: "flex-start", marginTop: 8, fontFamily: "'DM Sans', sans-serif" },
+  navRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 20, marginBottom: 16 },
+  navArrow: { background: C.surface, border: `1px solid ${C.border}`, color: C.muted, borderRadius: "50%", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+  counter: { fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: C.muted, minWidth: 60, textAlign: "center" },
+  prayBtn: { background: `linear-gradient(135deg, ${C.gold}, #b8821e)`, border: "none", color: "#0e0c09", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif", boxShadow: "0 4px 20px rgba(201,152,42,0.3)" },
+  prayedActions: { display: "flex", alignItems: "center", justifyContent: "center", gap: 12 },
+  prayedConfirm: { display: "flex", alignItems: "center", color: C.prayedGreen, fontSize: 15, fontWeight: 500 },
+  undoBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: "6px 14px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  // WEEK
+  weekWrap: { flex: 1, padding: "16px 20px 32px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" },
+  weekTitle: { fontFamily: "'Cormorant Garamond', serif", fontSize: 28, color: C.cream, margin: 0, fontWeight: 400 },
+  weekSection: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" },
+  sectionHead: { display: "flex", alignItems: "center", padding: "11px 14px", borderBottom: `1px solid ${C.border}`, background: "#161109" },
+  sectionTitle: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: "0.09em", fontWeight: 500 },
+  weekRow: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderBottom: `1px solid ${C.faint}` },
+  weekName: { fontSize: 14, color: C.cream },
+  weekMeta: { fontSize: 11, color: C.muted, marginTop: 2 },
+  weekEmpty: { fontSize: 13, color: "#3a3020", padding: "16px 14px", margin: 0, textAlign: "center", fontStyle: "italic" },
+  allPrayedBanner: { display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "22px 14px" },
+  allPrayedText: { fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: C.gold, textAlign: "center" },
+  // PEOPLE
+  peopleWrap: { flex: 1, padding: "16px 20px 28px", display: "flex", flexDirection: "column", gap: 10 },
+  addRow: { display: "flex", gap: 8 },
+  addInput: { flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, color: C.cream, padding: "10px 12px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none" },
+  addTypeSelect: { background: C.surface, border: `1px solid ${C.border}`, color: C.muted, borderRadius: 10, padding: "10px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", outline: "none" },
+  addPersonBtn: { background: C.gold, border: "none", color: "#0e0c09", borderRadius: 10, width: 42, height: 42, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 },
+  statRow: { display: "flex", gap: 6 },
+  statChip: { flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 },
+  statNum: { fontSize: 18, fontFamily: "'Cormorant Garamond', serif", color: C.cream },
+  statLbl: { fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em" },
+  personList: { display: "flex", flexDirection: "column", gap: 4 },
+  personCard: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" },
+  personRow: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px" },
+  personLeft: { display: "flex", flexDirection: "column", gap: 4 },
+  personName: { fontSize: 14, color: C.cream },
+  personMeta: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" },
+  badgeSm: { fontSize: 10, padding: "2px 8px", borderRadius: 8, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 500 },
+  studentBadgeSm: { background: C.studentBg, color: C.student },
+  leaderBadgeSm: { background: C.leaderBg, color: C.leader },
+  prayedSmall: { fontSize: 11, color: C.prayedGreen },
+  reqCountBadge: { fontSize: 11, color: C.gold, background: "#241c0a", padding: "1px 7px", borderRadius: 8 },
+  bdayBadgeSm: { display: "inline-flex", alignItems: "center", fontSize: 10, color: "#8a7040", background: "#1e1608", padding: "1px 7px", borderRadius: 8 },
+  personActions: { display: "flex", gap: 6 },
+  iconBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+  bdayEditRow: { display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderTop: `1px solid ${C.faint}`, background: "#171209" },
+  bdayInput: { flex: 1, background: "#0e0c09", border: `1px solid ${C.border}`, borderRadius: 8, color: C.cream, padding: "6px 10px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none" },
+  inactiveSection: { marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 12 },
+  inactiveHeading: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 8px" },
+  inactiveRow: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${C.faint}` },
+  inactiveName: { fontSize: 13, color: C.muted },
+  restoreBtn: { background: "none", border: `1px solid ${C.border}`, color: C.leader, borderRadius: 7, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  deleteBtn: { background: "none", border: `1px solid #3a1a1a`, color: "#8a5050", borderRadius: 7, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  // IMPORT
+  importWrap: { flex: 1, padding: "16px 20px 28px", display: "flex", flexDirection: "column", gap: 12, overflowY: "auto" },
+  importTitle: { fontFamily: "'Cormorant Garamond', serif", fontSize: 26, color: C.cream, margin: 0, fontWeight: 400 },
+  importDesc: { fontSize: 13, color: C.muted, margin: 0 },
+  importNote: { fontSize: 12, color: C.muted, margin: "0" },
+  importRulesBox: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "4px 0", display: "flex", flexDirection: "column" },
+  importRule: { display: "flex", gap: 12, padding: "11px 14px", borderBottom: `1px solid ${C.faint}`, fontSize: 12, color: C.muted, lineHeight: 1.5, alignItems: "flex-start" },
+  importRuleIcon: { fontSize: 16, flexShrink: 0, marginTop: 1 },
+  code: { background: C.faint, padding: "1px 6px", borderRadius: 4, fontSize: 11, color: C.gold, fontFamily: "monospace" },
+  csvPreview: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 14px", fontSize: 12, color: "#8a7660", margin: 0, lineHeight: 1.6, fontFamily: "monospace", overflowX: "auto" },
+  uploadBtn: { background: C.surface, border: `1px solid ${C.border}`, color: C.cream, borderRadius: 10, padding: "12px 20px", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", fontFamily: "'DM Sans', sans-serif", alignSelf: "flex-start" },
+  previewBox: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px" },
+  previewTitle: { fontSize: 12, color: C.muted, margin: "0 0 10px", textTransform: "uppercase", letterSpacing: "0.06em" },
+  previewScroll: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 200, overflowY: "auto" },
+  previewRow: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 0", borderBottom: `1px solid ${C.faint}` },
+  previewName: { fontSize: 13, color: C.cream },
+  moreText: { fontSize: 12, color: C.muted, margin: "6px 0 0", textAlign: "center" },
+  previewBtnRow: { display: "flex", gap: 8, marginTop: 12 },
+  confirmBtn: { background: `linear-gradient(135deg, ${C.gold}, #b8821e)`, border: "none", color: "#0e0c09", borderRadius: 8, padding: "9px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  cancelBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: "9px 16px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  suggestBox: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "16px", marginTop: 4 },
+  suggestTitle: { fontSize: 13, color: C.gold, margin: "0 0 10px", fontWeight: 500 },
+  suggestList: { margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 6 },
+  suggestItem: { fontSize: 12, color: C.muted, lineHeight: 1.5 },
+};
