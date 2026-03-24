@@ -305,6 +305,8 @@ export default function App() {
   const fileRef = useRef(null);
 
   const saveTimer = useRef(null);
+  const pollTimer = useRef(null);
+  const isSaving = useRef(false);
 
   // Admin auth
   const [adminAuthed, setAdminAuthedState] = useState(() => isAdminAuthed());
@@ -339,11 +341,30 @@ export default function App() {
   useEffect(() => {
     if (!loaded) return;
     clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      apiSave(people).catch(() => {});
+    saveTimer.current = setTimeout(async () => {
+      isSaving.current = true;
+      await apiSave(people).catch(() => {});
+      isSaving.current = false;
     }, 1500);
     return () => clearTimeout(saveTimer.current);
   }, [people, loaded]);
+
+  // Poll for remote changes every 15s — skip if we're mid-save
+  useEffect(() => {
+    if (!loaded) return;
+    pollTimer.current = setInterval(async () => {
+      if (isSaving.current) return;
+      try {
+        const fresh = await apiLoad();
+        const freshStr = JSON.stringify(fresh);
+        setPeople(prev => {
+          if (JSON.stringify(prev) === freshStr) return prev; // no change
+          return fresh;
+        });
+      } catch {}
+    }, 15000);
+    return () => clearInterval(pollTimer.current);
+  }, [loaded]);
 
   const activePeople = people.filter(p => p.active !== false);
 
