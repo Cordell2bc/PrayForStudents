@@ -3,6 +3,20 @@ import { ChevronLeft, ChevronRight, Heart, Plus, Trash2, Upload, X, RefreshCw, B
 
 const STORAGE_KEY = "intercede-people-v2";
 const ADMIN_PASSWORD = "Promo1398!";
+const TAP_KEY = "intercede-tap-ts";
+const TAP_TTL = 24 * 60 * 60 * 1000;
+
+function shouldShowTap() {
+  try {
+    const raw = localStorage.getItem(TAP_KEY);
+    if (!raw) return true;
+    return Date.now() - Number(raw) > TAP_TTL;
+  } catch { return true; }
+}
+
+function recordTapShown() {
+  try { localStorage.setItem(TAP_KEY, String(Date.now())); } catch {}
+}
 const ADMIN_KEY = "intercede-admin-authed";
 const ADMIN_TTL = 86400000;
 
@@ -36,8 +50,23 @@ function genId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+function getWeekStartET() {
+  // Returns UTC timestamp of most recent Monday midnight Eastern Time
+  const now = new Date();
+  const etStr = now.toLocaleString("en-US", { timeZone: "America/New_York" });
+  const etNow = new Date(etStr);
+  const day = etNow.getDay(); // 0=Sun
+  const daysFromMon = day === 0 ? 6 : day - 1;
+  const monET = new Date(etNow);
+  monET.setDate(etNow.getDate() - daysFromMon);
+  monET.setHours(0, 0, 0, 0);
+  // Offset between real UTC and the "fake local" ET date object
+  const utcOffset = now.getTime() - etNow.getTime();
+  return monET.getTime() + utcOffset;
+}
+
 function withinWeek(ts) {
-  return ts && Date.now() - ts < 7 * 24 * 60 * 60 * 1000;
+  return ts && ts >= getWeekStartET();
 }
 
 function timeAgo(ts) {
@@ -233,7 +262,9 @@ export default function App() {
   const [filter, setFilter] = useState("all");
   const [cardIdx, setCardIdx] = useState(0);
   const [deckIds, setDeckIds] = useState([]);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(() => !shouldShowTap());
+  const [pinnedPersonId, setPinnedPersonId] = useState(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   // Swipe
   const touchStartX = useRef(null);
@@ -326,25 +357,36 @@ export default function App() {
     if (f === "hs-leaders") list = list.filter(p => p.type === "leader" && p.group === "hs");
     if (f === "ms-leaders") list = list.filter(p => p.type === "leader" && p.group === "ms");
     if (f === "unprayed") list = list.filter(p => !withinWeek(p.prayedAt));
-    setDeckIds(shuffle(list.map(p => p.id)));
+    // Always exclude prayed-this-week from swipe deck
+    const unprayed = list.filter(p => !withinWeek(p.prayedAt));
+    setDeckIds(shuffle(unprayed.map(p => p.id)));
     setCardIdx(0);
+    setPinnedPersonId(null);
+    setDropdownOpen(false);
+    if (shouldShowTap()) setReady(false);
   }, [people, filter]);
 
-  // Reset "ready" whenever the deck is intentionally rebuilt (filter change or load)
+  useEffect(() => { if (loaded) buildDeck(); }, [loaded, filter, order]);
+
+  // When someone gets marked as prayed, remove them from deck immediately
   useEffect(() => {
-    if (loaded) {
-      buildDeck();
-      setReady(false);
-    }
-  }, [loaded, filter]);
+    if (!loaded) return;
+    setDeckIds(prev => {
+      const prayedSet = new Set(activePeople.filter(p => withinWeek(p.prayedAt)).map(p => p.id));
+      const filtered = prev.filter(id => !prayedSet.has(id));
+      if (filtered.length !== prev.length) { setCardIdx(i => Math.min(i, Math.max(filtered.length - 1, 0))); }
+      return filtered;
+    });
+  }, [people]);
 
   const deck = (() => {
-    if (order === "alpha") return getFiltered().slice().sort((a, b) => a.name.localeCompare(b.name));
+    if (order === "alpha") return getFiltered().filter(p => !withinWeek(p.prayedAt)).slice().sort((a, b) => a.name.localeCompare(b.name));
     const map = Object.fromEntries(activePeople.map(p => [p.id, p]));
     return deckIds.map(id => map[id]).filter(Boolean);
   })();
 
-  const current = deck[cardIdx] ?? null;
+  const pinnedPerson = pinnedPersonId ? activePeople.find(p => p.id === pinnedPersonId) ?? null : null;
+  const current = pinnedPerson ?? deck[cardIdx] ?? null;
   const prayedCount = activePeople.filter(p => withinWeek(p.prayedAt)).length;
   const upcomingBdays = getUpcomingBirthdays(activePeople);
   const urgentBdays = upcomingBdays.filter(b => b.diff <= 3).length;
@@ -352,12 +394,27 @@ export default function App() {
   function nav(dir) {
     setReqFor(null);
     setSwipeDelta(0);
+    setPinnedPersonId(null);
     setCardIdx(i => {
       let n = i + dir;
       if (n < 0) n = deck.length - 1;
       if (n >= deck.length) n = 0;
       return n;
     });
+  }
+
+  function selectFromDropdown(personId) {
+    setDropdownOpen(false);
+    setReqFor(null);
+    // If person is in unprayed deck, jump to their index
+    const deckIdx = deck.findIndex(p => p.id === personId);
+    if (deckIdx >= 0) {
+      setPinnedPersonId(null);
+      setCardIdx(deckIdx);
+    } else {
+      // Already prayed — pin their card
+      setPinnedPersonId(personId);
+    }
   }
 
   function handleTouchStart(e) {
@@ -568,7 +625,7 @@ export default function App() {
                 /* ── Tap to Begin splash ── */
                 <div
                   style={S.cardOuter}
-                  onClick={() => setReady(true)}
+                  onClick={() => { setReady(true); recordTapShown(); }}
                 >
                   <div style={{ ...S.cardGhost, transform: "rotate(2deg) translateY(6px)", opacity: 0.35 }} />
                   <div style={{ ...S.cardGhost, transform: "rotate(-1.5deg) translateY(3px)", opacity: 0.55 }} />
@@ -652,20 +709,52 @@ export default function App() {
 
                   <div style={S.navRow}>
                     <button onClick={() => nav(-1)} style={S.navArrow}><ChevronLeft size={22} /></button>
-                    <span style={S.counter}>{cardIdx + 1} <span style={{ color: "#5a4832" }}>/</span> {deck.length}</span>
+                    <span style={S.counter}>
+                      {pinnedPerson ? "★" : `${cardIdx + 1}`}
+                      <span style={{ color: "#5a4832" }}> / </span>
+                      {deck.length}
+                    </span>
                     <button onClick={() => nav(1)} style={S.navArrow}><ChevronRight size={22} /></button>
                   </div>
 
                   {withinWeek(current?.prayedAt) ? (
                     <div style={S.prayedActions}>
                       <div style={S.prayedConfirm}><Heart size={16} fill="#9dc88d" color="#9dc88d" style={{ marginRight: 7 }} /> Prayed!</div>
-                      <button onClick={unmarkPrayed} style={S.undoBtn}>Undo</button>
+                      {!pinnedPerson && <button onClick={unmarkPrayed} style={S.undoBtn}>Undo</button>}
+                      {pinnedPerson && <button onClick={() => setPinnedPersonId(null)} style={S.undoBtn}>Back</button>}
                     </div>
                   ) : (
                     <button onClick={markPrayed} style={S.prayBtn}>
                       <Heart size={16} style={{ marginRight: 8 }} /> Mark as Prayed
                     </button>
                   )}
+
+                  {/* Quick-find dropdown */}
+                  {(() => {
+                    const dropList = getFiltered().slice().sort((a, b) => a.name.localeCompare(b.name));
+                    return (
+                      <div style={S.ddWrap}>
+                        <button onClick={() => setDropdownOpen(o => !o)} style={S.ddToggle}>
+                          <span>Tap to Pray…</span>
+                          <span style={{ fontSize: 10, opacity: 0.5 }}>{dropdownOpen ? "▲" : "▼"}</span>
+                        </button>
+                        {dropdownOpen && (
+                          <div style={S.ddList}>
+                            {dropList.map(p => (
+                              <button key={p.id} onClick={() => selectFromDropdown(p.id)}
+                                style={{ ...S.ddItem, ...(withinWeek(p.prayedAt) ? S.ddItemPrayed : {}) }}>
+                                <span>{p.name}</span>
+                                <span style={S.ddItemMeta}>
+                                  {withinWeek(p.prayedAt) ? "✓ prayed" : ""}
+                                  {p.group ? ` ${p.group.toUpperCase()}` : ""}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </>
               )}
             </>
@@ -1050,6 +1139,13 @@ const S = {
   modalInput: { background: "#0e0c09", border: "1px solid #2e2518", borderRadius: 10, color: "#e2cfb0", padding: "12px 14px", fontSize: 16, fontFamily: "'DM Sans', sans-serif", outline: "none", textAlign: "center", letterSpacing: "0.08em" },
   modalError: { fontSize: 12, color: "#c07070", margin: 0, textAlign: "center" },
   modalBtns: { display: "flex", gap: 8 },
+  // DROPDOWN
+  ddWrap: { marginTop: 12, display: "flex", flexDirection: "column" },
+  ddToggle: { background: "#1b1610", border: "1px solid #2e2518", borderRadius: 10, color: "#7d6a52", padding: "10px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", justifyContent: "space-between", alignItems: "center" },
+  ddList: { background: "#161109", border: "1px solid #2e2518", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: 260, overflowY: "auto", display: "flex", flexDirection: "column" },
+  ddItem: { background: "none", border: "none", borderBottom: "1px solid #1e1810", color: "#e2cfb0", padding: "11px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", justifyContent: "space-between", alignItems: "center", textAlign: "left" },
+  ddItemPrayed: { color: "#4a5e44" },
+  ddItemMeta: { fontSize: 11, color: "#3a3020", marginLeft: 8, flexShrink: 0 },
   // TAP TO BEGIN
   tapCard: { cursor: "pointer", alignItems: "center", justifyContent: "center", minHeight: 220, gap: 10, animation: "tapPulse 2s ease-in-out infinite" },
   tapCross: { fontSize: 28, color: C.gold, marginBottom: 8 },
