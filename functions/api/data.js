@@ -6,6 +6,7 @@ export async function onRequest(context) {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
+    "Cache-Control": "no-store, no-cache, must-revalidate",
   };
 
   if (request.method === "OPTIONS") {
@@ -14,8 +15,7 @@ export async function onRequest(context) {
 
   if (!env.INTERCEDE_KV) {
     return new Response(JSON.stringify({ error: "KV namespace not bound" }), {
-      status: 500,
-      headers,
+      status: 500, headers,
     });
   }
 
@@ -32,14 +32,12 @@ export async function onRequest(context) {
       return new Response(JSON.stringify({ ok: true }), { headers });
     } catch {
       return new Response(JSON.stringify({ error: "Invalid JSON" }), {
-        status: 400,
-        headers,
+        status: 400, headers,
       });
     }
   }
 
   return new Response(JSON.stringify({ error: "Method not allowed" }), {
-    status: 405,
-    headers,
+    status: 405, headers,
   });
 }
