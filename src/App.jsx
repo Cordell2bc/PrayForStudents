@@ -2,6 +2,24 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, Heart, Plus, Trash2, Upload, X, RefreshCw, BookOpen, RotateCcw, Cake } from "lucide-react";
 
 const STORAGE_KEY = "intercede-people-v2";
+const PIN_KEY = "intercede-pin";
+
+async function apiLoad(pin) {
+  const res = await fetch("/api/data", { headers: { "x-pin": pin } });
+  if (res.status === 401) throw new Error("unauthorized");
+  if (!res.ok) throw new Error("load failed");
+  return await res.json();
+}
+
+async function apiSave(pin, people) {
+  const res = await fetch("/api/data", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-pin": pin },
+    body: JSON.stringify(people),
+  });
+  if (res.status === 401) throw new Error("unauthorized");
+  if (!res.ok) throw new Error("save failed");
+}
 
 function genId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -223,6 +241,13 @@ export default function App() {
   const [importData, setImportData] = useState(null);
   const fileRef = useRef(null);
 
+  // PIN auth
+  const [pin, setPin] = useState(() => localStorage.getItem(PIN_KEY) || "");
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [pinAuthed, setPinAuthed] = useState(false);
+  const saveTimer = useRef(null);
+
   useEffect(() => {
     const link = document.createElement("link");
     link.rel = "stylesheet";
@@ -231,18 +256,36 @@ export default function App() {
     return () => link.remove();
   }, []);
 
+  // Load from KV on auth
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("intercede-people-v1");
-      if (saved) setPeople(JSON.parse(saved));
-    } catch {}
-    setLoaded(true);
-  }, []);
+    if (!pin) { setLoaded(true); return; }
+    (async () => {
+      try {
+        const data = await apiLoad(pin);
+        setPeople(data);
+        setPinAuthed(true);
+      } catch (e) {
+        if (e.message === "unauthorized") {
+          localStorage.removeItem(PIN_KEY);
+          setPin("");
+          setPinError("Wrong PIN — try again.");
+        }
+      }
+      setLoaded(true);
+    })();
+  }, [pin]);
 
+  // Save to KV (debounced 1.5s)
   useEffect(() => {
-    if (!loaded) return;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(people)); } catch {}
-  }, [people, loaded]);
+    if (!loaded || !pin || !pinAuthed) return;
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      apiSave(pin, people).catch(e => {
+        if (e.message === "unauthorized") { setPin(""); setPinAuthed(false); }
+      });
+    }, 1500);
+    return () => clearTimeout(saveTimer.current);
+  }, [people, loaded, pin, pinAuthed]);
 
   const activePeople = people.filter(p => p.active !== false);
 
@@ -372,8 +415,73 @@ export default function App() {
     setView("people");
   }
 
+  function submitPin(e) {
+    e && e.preventDefault();
+    if (!pinInput.trim()) return;
+    setPinError("");
+    localStorage.setItem(PIN_KEY, pinInput.trim());
+    setPin(pinInput.trim());
+  }
+
+  // PIN entry screen
+  if (!loaded && !pin) {
+    return (
+      <div style={S.root}>
+        <div style={S.pinWrap}>
+          <span style={S.logoCross}>&#10022;</span>
+          <h1 style={S.pinTitle}>Intercede</h1>
+          <p style={S.pinSub}>Enter your PIN to continue</p>
+          <input
+            autoFocus
+            type="password"
+            inputMode="numeric"
+            value={pinInput}
+            onChange={e => setPinInput(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && submitPin()}
+            placeholder="PIN"
+            style={S.pinInput}
+          />
+          {pinError && <p style={S.pinError}>{pinError}</p>}
+          <button onClick={submitPin} style={S.pinBtn}>Unlock</button>
+        </div>
+      </div>
+    );
+  }
+
   if (!loaded) {
-    return <div style={S.root}><p style={{ color: "#c4a882", fontFamily: "Cormorant Garamond, serif", textAlign: "center", marginTop: 80, fontSize: 20 }}>Loading…</p></div>;
+    return (
+      <div style={S.root}>
+        <div style={S.pinWrap}>
+          <span style={S.logoCross}>&#10022;</span>
+          <h1 style={S.pinTitle}>Intercede</h1>
+          <p style={S.pinSub}>Loading…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!pinAuthed) {
+    return (
+      <div style={S.root}>
+        <div style={S.pinWrap}>
+          <span style={S.logoCross}>&#10022;</span>
+          <h1 style={S.pinTitle}>Intercede</h1>
+          <p style={S.pinSub}>Enter your PIN to continue</p>
+          <input
+            autoFocus
+            type="password"
+            inputMode="numeric"
+            value={pinInput}
+            onChange={e => setPinInput(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && submitPin()}
+            placeholder="PIN"
+            style={S.pinInput}
+          />
+          {pinError && <p style={S.pinError}>{pinError}</p>}
+          <button onClick={submitPin} style={S.pinBtn}>Unlock</button>
+        </div>
+      </div>
+    );
   }
 
   const bdayStatus = current ? getBirthdayStatus(current.birthday) : null;
@@ -864,4 +972,11 @@ const S = {
   suggestTitle: { fontSize: 13, color: C.gold, margin: "0 0 10px", fontWeight: 500 },
   suggestList: { margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 6 },
   suggestItem: { fontSize: 12, color: C.muted, lineHeight: 1.5 },
+  // PIN
+  pinWrap: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 32px", gap: 16 },
+  pinTitle: { fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: C.cream, margin: 0, letterSpacing: "0.04em" },
+  pinSub: { fontSize: 13, color: C.muted, margin: 0 },
+  pinInput: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, color: C.cream, padding: "14px 18px", fontSize: 22, fontFamily: "'DM Sans', sans-serif", outline: "none", width: "100%", maxWidth: 220, textAlign: "center", letterSpacing: "0.2em" },
+  pinBtn: { background: `linear-gradient(135deg, ${C.gold}, #b8821e)`, border: "none", color: "#0e0c09", borderRadius: 12, padding: "13px 40px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", boxShadow: "0 4px 20px rgba(201,152,42,0.3)", marginTop: 4 },
+  pinError: { fontSize: 12, color: "#c07070", margin: 0 },
 };
