@@ -271,7 +271,10 @@ export default function App() {
     link.rel = "stylesheet";
     link.href = "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap";
     document.head.appendChild(link);
-    return () => link.remove();
+    const style = document.createElement("style");
+    style.textContent = `@keyframes tapPulse { 0%,100%{opacity:1} 50%{opacity:0.65} }`;
+    document.head.appendChild(style);
+    return () => { link.remove(); style.remove(); };
   }, []);
 
   // Load from KV
@@ -325,10 +328,15 @@ export default function App() {
     if (f === "unprayed") list = list.filter(p => !withinWeek(p.prayedAt));
     setDeckIds(shuffle(list.map(p => p.id)));
     setCardIdx(0);
-    setReady(false);
   }, [people, filter]);
 
-  useEffect(() => { if (loaded) buildDeck(); }, [loaded, filter]);
+  // Reset "ready" whenever the deck is intentionally rebuilt (filter change or load)
+  useEffect(() => {
+    if (loaded) {
+      buildDeck();
+      setReady(false);
+    }
+  }, [loaded, filter]);
 
   const deck = (() => {
     if (order === "alpha") return getFiltered().slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -561,7 +569,6 @@ export default function App() {
                 <div
                   style={S.cardOuter}
                   onClick={() => setReady(true)}
-                  onTouchEnd={e => { e.preventDefault(); setReady(true); }}
                 >
                   <div style={{ ...S.cardGhost, transform: "rotate(2deg) translateY(6px)", opacity: 0.35 }} />
                   <div style={{ ...S.cardGhost, transform: "rotate(-1.5deg) translateY(3px)", opacity: 0.55 }} />
@@ -1044,7 +1051,7 @@ const S = {
   modalError: { fontSize: 12, color: "#c07070", margin: 0, textAlign: "center" },
   modalBtns: { display: "flex", gap: 8 },
   // TAP TO BEGIN
-  tapCard: { cursor: "pointer", alignItems: "center", justifyContent: "center", minHeight: 220, gap: 10 },
+  tapCard: { cursor: "pointer", alignItems: "center", justifyContent: "center", minHeight: 220, gap: 10, animation: "tapPulse 2s ease-in-out infinite" },
   tapCross: { fontSize: 28, color: C.gold, marginBottom: 8 },
   tapTitle: { fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: C.cream, margin: 0, textAlign: "center" },
   tapSub: { fontSize: 13, color: C.muted, margin: 0, textAlign: "center" },
