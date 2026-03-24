@@ -379,7 +379,7 @@ export default function App() {
     setCardIdx(0);
     setPinnedPersonId(null);
     setDropdownOpen(false);
-    if (shouldShowTap()) setReady(false);
+    if (shouldShowTap()) setReady(false); else setReady(true);
   }, [people, filter]);
 
   useEffect(() => { if (loaded) buildDeck(); }, [loaded, filter, order]);
@@ -647,9 +647,9 @@ export default function App() {
           <div style={S.controls}>
             <div style={S.togglePill}>
               <button onClick={() => { setOrder("random"); buildDeck(); }} style={{ ...S.toggleOpt, ...(order === "random" ? S.toggleOptOn : {}) }}>Shuffle</button>
-              <button onClick={() => { setOrder("alpha"); setCardIdx(0); setReady(false); }} style={{ ...S.toggleOpt, ...(order === "alpha" ? S.toggleOptOn : {}) }}>A–Z</button>
+              <button onClick={() => { setOrder("alpha"); setCardIdx(0); if (shouldShowTap()) setReady(false); }} style={{ ...S.toggleOpt, ...(order === "alpha" ? S.toggleOptOn : {}) }}>A–Z</button>
             </div>
-            <select value={filter} onChange={e => { setFilter(e.target.value); setCardIdx(0); setReady(false); }} style={S.filterSelect}>
+            <select value={filter} onChange={e => { setFilter(e.target.value); setCardIdx(0); if (shouldShowTap()) setReady(false); }} style={S.filterSelect}>
               <option value="all">Everyone</option>
               <option value="ms-students">MS Students</option>
               <option value="hs-students">HS Students</option>
