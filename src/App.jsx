@@ -233,6 +233,7 @@ export default function App() {
   const [filter, setFilter] = useState("all");
   const [cardIdx, setCardIdx] = useState(0);
   const [deckIds, setDeckIds] = useState([]);
+  const [ready, setReady] = useState(false);
 
   // Swipe
   const touchStartX = useRef(null);
@@ -324,6 +325,7 @@ export default function App() {
     if (f === "unprayed") list = list.filter(p => !withinWeek(p.prayedAt));
     setDeckIds(shuffle(list.map(p => p.id)));
     setCardIdx(0);
+    setReady(false);
   }, [people, filter]);
 
   useEffect(() => { if (loaded) buildDeck(); }, [loaded, filter]);
@@ -479,7 +481,7 @@ export default function App() {
       <header style={S.header}>
         <div style={S.logoWrap}>
           <span style={S.logoCross}>✦</span>
-          <span style={S.logoText}>Intercede</span>
+          <span style={S.logoText}>Calvary Students</span>
         </div>
         <div style={S.weekBar}>
           <Heart size={13} color="#d4916a" fill="#d4916a" />
@@ -532,18 +534,13 @@ export default function App() {
           <div style={S.controls}>
             <div style={S.togglePill}>
               <button onClick={() => { setOrder("random"); buildDeck(); }} style={{ ...S.toggleOpt, ...(order === "random" ? S.toggleOptOn : {}) }}>Shuffle</button>
-              <button onClick={() => { setOrder("alpha"); setCardIdx(0); }} style={{ ...S.toggleOpt, ...(order === "alpha" ? S.toggleOptOn : {}) }}>A–Z</button>
+              <button onClick={() => { setOrder("alpha"); setCardIdx(0); setReady(false); }} style={{ ...S.toggleOpt, ...(order === "alpha" ? S.toggleOptOn : {}) }}>A–Z</button>
             </div>
-            <select value={filter} onChange={e => { setFilter(e.target.value); setCardIdx(0); }} style={S.filterSelect}>
+            <select value={filter} onChange={e => { setFilter(e.target.value); setCardIdx(0); setReady(false); }} style={S.filterSelect}>
               <option value="all">Everyone</option>
-              <option value="students">All Students</option>
-              <option value="hs-students">HS Students</option>
               <option value="ms-students">MS Students</option>
-              <option value="leaders">All Leaders</option>
-              <option value="hs-leaders">HS Leaders</option>
-              <option value="ms-leaders">MS Leaders</option>
-              <option value="hs">All HS</option>
-              <option value="ms">All MS</option>
+              <option value="hs-students">HS Students</option>
+              <option value="leaders">Leaders</option>
               <option value="unprayed">Unprayed</option>
             </select>
             {order === "random" && (
@@ -559,91 +556,110 @@ export default function App() {
             </div>
           ) : (
             <>
-              <div style={S.swipeHint}>← swipe to navigate →</div>
-
-              <div style={S.cardOuter} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
-                <div style={{ ...S.cardGhost, transform: "rotate(2deg) translateY(6px)", opacity: 0.35 }} />
-                <div style={{ ...S.cardGhost, transform: "rotate(-1.5deg) translateY(3px)", opacity: 0.55 }} />
-                <div style={{
-                  ...S.card,
-                  ...(withinWeek(current?.prayedAt) ? S.cardDone : {}),
-                  transform: isSwiping ? `translateX(${swipeDelta * 0.35}px) rotate(${swipeDelta * 0.018}deg)` : "none",
-                  transition: isSwiping ? "none" : "transform 0.25s cubic-bezier(.25,.46,.45,.94)",
-                  opacity: isSwiping ? Math.max(0.6, 1 - Math.abs(swipeDelta) / 400) : 1,
-                }}>
-                  <div style={S.badgeRow}>
-                    <div style={{ ...S.badge, ...(current?.type === "leader" ? S.leaderBadge : S.studentBadge) }}>
-                      {current?.type === "leader" ? "Leader" : "Student"}
-                    </div>
-                    {current?.group && (
-                      <div style={{ ...S.badge, ...(current.group === "hs" ? S.hsBadge : S.msBadge) }}>
-                        {current.group.toUpperCase()}
-                      </div>
-                    )}
+              {!ready ? (
+                /* ── Tap to Begin splash ── */
+                <div
+                  style={S.cardOuter}
+                  onClick={() => setReady(true)}
+                  onTouchEnd={e => { e.preventDefault(); setReady(true); }}
+                >
+                  <div style={{ ...S.cardGhost, transform: "rotate(2deg) translateY(6px)", opacity: 0.35 }} />
+                  <div style={{ ...S.cardGhost, transform: "rotate(-1.5deg) translateY(3px)", opacity: 0.55 }} />
+                  <div style={{ ...S.card, ...S.tapCard }}>
+                    <div style={S.tapCross}>✦</div>
+                    <h2 style={S.tapTitle}>Tap to Begin</h2>
+                    <p style={S.tapSub}>{deck.length} {filter === "all" ? "people" : filter.replace("-", " ")} ready</p>
                   </div>
-                  <h2 style={S.cardName}>{current?.name}</h2>
-
-                  {bdayStatus && (
-                    <div style={{ ...S.bdayChip, ...(bdayStatus.urgent ? S.bdayChipUrgent : {}) }}>{bdayStatus.label}</div>
-                  )}
-                  {current?.birthday && !bdayStatus && (
-                    <div style={S.bdayQuiet}><Cake size={11} style={{ marginRight: 5, opacity: 0.5 }} />{formatBirthday(current.birthday)}</div>
-                  )}
-
-                  <div style={S.cardPrayedRow}>
-                    {withinWeek(current?.prayedAt) ? (
-                      <span style={S.prayedChip}>✓ Prayed {timeAgo(current.prayedAt)}</span>
-                    ) : current?.prayedAt ? (
-                      <span style={S.lastPrayedChip}>Last: {timeAgo(current.prayedAt)}</span>
-                    ) : (
-                      <span style={S.neverChip}>Not yet prayed for</span>
-                    )}
-                  </div>
-
-                  {(current?.prayerRequests || []).length > 0 && (
-                    <div style={S.reqBox}>
-                      <p style={S.reqLabel}>Prayer Requests</p>
-                      {current.prayerRequests.map((req, i) => (
-                        <div key={i} style={S.reqItem}>
-                          <span style={S.reqDot}>◆</span>
-                          <span style={S.reqText}>{req}</span>
-                          <button onClick={() => removeRequest(current.id, i)} style={S.reqRemove}><X size={11} /></button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {reqFor === current?.id ? (
-                    <div style={S.reqInputRow}>
-                      <input autoFocus value={reqText} onChange={e => setReqText(e.target.value)}
-                        onKeyDown={e => { if (e.key === "Enter") addRequest(current.id); if (e.key === "Escape") setReqFor(null); }}
-                        placeholder="Enter prayer request…" style={S.reqInput} />
-                      <button onClick={() => addRequest(current.id)} style={S.reqAddBtn}>Add</button>
-                      <button onClick={() => setReqFor(null)} style={S.reqCancelBtn}><X size={13} /></button>
-                    </div>
-                  ) : (
-                    <button onClick={() => setReqFor(current?.id)} style={S.addReqTrigger}>
-                      <Plus size={13} style={{ marginRight: 4 }} /> Add Request
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div style={S.navRow}>
-                <button onClick={() => nav(-1)} style={S.navArrow}><ChevronLeft size={22} /></button>
-                <span style={S.counter}>{cardIdx + 1} <span style={{ color: "#5a4832" }}>/</span> {deck.length}</span>
-                <button onClick={() => nav(1)} style={S.navArrow}><ChevronRight size={22} /></button>
-              </div>
-
-              {withinWeek(current?.prayedAt) ? (
-                <div style={S.prayedActions}>
-                  <div style={S.prayedConfirm}><Heart size={16} fill="#9dc88d" color="#9dc88d" style={{ marginRight: 7 }} /> Prayed!</div>
-                  <button onClick={unmarkPrayed} style={S.undoBtn}>Undo</button>
                 </div>
               ) : (
-                <button onClick={markPrayed} style={S.prayBtn}>
-                  <Heart size={16} style={{ marginRight: 8 }} /> Mark as Prayed
-                </button>
+                <>
+                  <div style={S.swipeHint}>← swipe to navigate →</div>
+
+                  <div style={S.cardOuter} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+                    <div style={{ ...S.cardGhost, transform: "rotate(2deg) translateY(6px)", opacity: 0.35 }} />
+                    <div style={{ ...S.cardGhost, transform: "rotate(-1.5deg) translateY(3px)", opacity: 0.55 }} />
+                    <div style={{
+                      ...S.card,
+                      ...(withinWeek(current?.prayedAt) ? S.cardDone : {}),
+                      transform: isSwiping ? `translateX(${swipeDelta * 0.35}px) rotate(${swipeDelta * 0.018}deg)` : "none",
+                      transition: isSwiping ? "none" : "transform 0.25s cubic-bezier(.25,.46,.45,.94)",
+                      opacity: isSwiping ? Math.max(0.6, 1 - Math.abs(swipeDelta) / 400) : 1,
+                    }}>
+                      <div style={S.badgeRow}>
+                        <div style={{ ...S.badge, ...(current?.type === "leader" ? S.leaderBadge : S.studentBadge) }}>
+                          {current?.type === "leader" ? "Leader" : "Student"}
+                        </div>
+                        {current?.group && (
+                          <div style={{ ...S.badge, ...(current.group === "hs" ? S.hsBadge : S.msBadge) }}>
+                            {current.group.toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <h2 style={S.cardName}>{current?.name}</h2>
+
+                      {bdayStatus && (
+                        <div style={{ ...S.bdayChip, ...(bdayStatus.urgent ? S.bdayChipUrgent : {}) }}>{bdayStatus.label}</div>
+                      )}
+                      {current?.birthday && !bdayStatus && (
+                        <div style={S.bdayQuiet}><Cake size={11} style={{ marginRight: 5, opacity: 0.5 }} />{formatBirthday(current.birthday)}</div>
+                      )}
+
+                      <div style={S.cardPrayedRow}>
+                        {withinWeek(current?.prayedAt) ? (
+                          <span style={S.prayedChip}>✓ Prayed {timeAgo(current.prayedAt)}</span>
+                        ) : current?.prayedAt ? (
+                          <span style={S.lastPrayedChip}>Last: {timeAgo(current.prayedAt)}</span>
+                        ) : (
+                          <span style={S.neverChip}>Not yet prayed for</span>
+                        )}
+                      </div>
+
+                      {(current?.prayerRequests || []).length > 0 && (
+                        <div style={S.reqBox}>
+                          <p style={S.reqLabel}>Prayer Requests</p>
+                          {current.prayerRequests.map((req, i) => (
+                            <div key={i} style={S.reqItem}>
+                              <span style={S.reqDot}>◆</span>
+                              <span style={S.reqText}>{req}</span>
+                              <button onClick={() => removeRequest(current.id, i)} style={S.reqRemove}><X size={11} /></button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {reqFor === current?.id ? (
+                        <div style={S.reqInputRow}>
+                          <input autoFocus value={reqText} onChange={e => setReqText(e.target.value)}
+                            onKeyDown={e => { if (e.key === "Enter") addRequest(current.id); if (e.key === "Escape") setReqFor(null); }}
+                            placeholder="Enter prayer request…" style={S.reqInput} />
+                          <button onClick={() => addRequest(current.id)} style={S.reqAddBtn}>Add</button>
+                          <button onClick={() => setReqFor(null)} style={S.reqCancelBtn}><X size={13} /></button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setReqFor(current?.id)} style={S.addReqTrigger}>
+                          <Plus size={13} style={{ marginRight: 4 }} /> Add Request
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={S.navRow}>
+                    <button onClick={() => nav(-1)} style={S.navArrow}><ChevronLeft size={22} /></button>
+                    <span style={S.counter}>{cardIdx + 1} <span style={{ color: "#5a4832" }}>/</span> {deck.length}</span>
+                    <button onClick={() => nav(1)} style={S.navArrow}><ChevronRight size={22} /></button>
+                  </div>
+
+                  {withinWeek(current?.prayedAt) ? (
+                    <div style={S.prayedActions}>
+                      <div style={S.prayedConfirm}><Heart size={16} fill="#9dc88d" color="#9dc88d" style={{ marginRight: 7 }} /> Prayed!</div>
+                      <button onClick={unmarkPrayed} style={S.undoBtn}>Undo</button>
+                    </div>
+                  ) : (
+                    <button onClick={markPrayed} style={S.prayBtn}>
+                      <Heart size={16} style={{ marginRight: 8 }} /> Mark as Prayed
+                    </button>
+                  )}
+                </>
               )}
             </>
           )}
@@ -1027,6 +1043,11 @@ const S = {
   modalInput: { background: "#0e0c09", border: "1px solid #2e2518", borderRadius: 10, color: "#e2cfb0", padding: "12px 14px", fontSize: 16, fontFamily: "'DM Sans', sans-serif", outline: "none", textAlign: "center", letterSpacing: "0.08em" },
   modalError: { fontSize: 12, color: "#c07070", margin: 0, textAlign: "center" },
   modalBtns: { display: "flex", gap: 8 },
+  // TAP TO BEGIN
+  tapCard: { cursor: "pointer", alignItems: "center", justifyContent: "center", minHeight: 220, gap: 10 },
+  tapCross: { fontSize: 28, color: C.gold, marginBottom: 8 },
+  tapTitle: { fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: C.cream, margin: 0, textAlign: "center" },
+  tapSub: { fontSize: 13, color: C.muted, margin: 0, textAlign: "center" },
   // GROUP BADGES
   badgeRow: { display: "flex", gap: 6, marginBottom: 14 },
   hsBadge: { background: "#162533", color: "#7aafc4", border: "1px solid #7aafc433", marginBottom: 0 },
