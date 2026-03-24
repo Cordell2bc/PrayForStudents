@@ -121,7 +121,7 @@ function getUpcomingBirthdays(people) {
     let bday = new Date(today.getFullYear(), month - 1, day);
     if (bday < todayMidnight) bday = new Date(today.getFullYear() + 1, month - 1, day);
     const diff = Math.round((bday - todayMidnight) / 86400000);
-    if (diff <= 30) results.push({ person: p, diff, date: bday });
+    if (diff <= 7) results.push({ person: p, diff, date: bday });
   }
   return results.sort((a, b) => a.diff - b.diff);
 }
@@ -278,6 +278,8 @@ export default function App() {
   const [addGroup, setAddGroup] = useState("hs");
   const [search, setSearch] = useState("");
   const [editBdayFor, setEditBdayFor] = useState(null);
+  const [editNameFor, setEditNameFor] = useState(null);
+  const [nameInput, setNameInput] = useState("");
   const [bdayInput, setBdayInput] = useState("");
 
   // Prayer requests
@@ -478,6 +480,13 @@ export default function App() {
     setPeople(prev => prev.map(p => p.id === id ? { ...p, birthday: val } : p));
     setEditBdayFor(null);
     setBdayInput("");
+  }
+
+  function saveName(id) {
+    if (!nameInput.trim()) return;
+    setPeople(prev => prev.map(p => p.id === id ? { ...p, name: nameInput.trim() } : p));
+    setEditNameFor(null);
+    setNameInput("");
   }
 
   function addRequest(personId) {
@@ -865,7 +874,21 @@ export default function App() {
               <div key={p.id} style={S.personCard}>
                 <div style={S.personRow}>
                   <div style={S.personLeft}>
-                    <span style={S.personName}>{p.name}</span>
+                    {editNameFor === p.id ? (
+                      <div style={S.nameEditRow}>
+                        <input autoFocus value={nameInput} onChange={e => setNameInput(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter") saveName(p.id); if (e.key === "Escape") setEditNameFor(null); }}
+                          style={S.nameInput} />
+                        <button onClick={() => saveName(p.id)} style={S.reqAddBtn}>Save</button>
+                        <button onClick={() => setEditNameFor(null)} style={S.reqCancelBtn}><X size={12} /></button>
+                      </div>
+                    ) : (
+                      <div style={S.nameRow}>
+                        <span style={S.personName}>{p.name}</span>
+                        <button onClick={() => { setEditNameFor(p.id); setNameInput(p.name); setEditBdayFor(null); }}
+                          style={S.editNameBtn} title="Edit name">✎</button>
+                      </div>
+                    )}
                     <div style={S.personMeta}>
                       <span style={{ ...S.badgeSm, ...(p.type === "leader" ? S.leaderBadgeSm : S.studentBadgeSm) }}>{p.type}</span>
                       {p.group && <span style={{ ...S.badgeSm, ...(p.group === "hs" ? S.hsBadgeSm : S.msBadgeSm) }}>{p.group.toUpperCase()}</span>}
@@ -875,7 +898,7 @@ export default function App() {
                     </div>
                   </div>
                   <div style={S.personActions}>
-                    <button onClick={() => { setEditBdayFor(editBdayFor === p.id ? null : p.id); setBdayInput(p.birthday || ""); }}
+                    <button onClick={() => { setEditBdayFor(editBdayFor === p.id ? null : p.id); setBdayInput(p.birthday || ""); setEditNameFor(null); }}
                       style={{ ...S.iconBtn, color: p.birthday ? C.gold : C.muted }} title="Set birthday"><Cake size={13} /></button>
                     <button onClick={() => cycleGroup(p.id)} style={{ ...S.iconBtn, color: p.group === "hs" ? "#7aafc4" : p.group === "ms" ? "#c49a6c" : C.muted }} title="Cycle HS/MS/none">
                       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.02em" }}>{p.group ? p.group.toUpperCase() : "—"}</span>
@@ -1097,6 +1120,10 @@ const S = {
   bdayBadgeSm: { display: "inline-flex", alignItems: "center", fontSize: 10, color: "#8a7040", background: "#1e1608", padding: "1px 7px", borderRadius: 8 },
   personActions: { display: "flex", gap: 6 },
   iconBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+  nameRow: { display: "flex", alignItems: "center", gap: 6 },
+  editNameBtn: { background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 13, padding: "0 2px", lineHeight: 1 },
+  nameEditRow: { display: "flex", alignItems: "center", gap: 6, marginBottom: 2 },
+  nameInput: { flex: 1, background: "#0e0c09", border: `1px solid ${C.border}`, borderRadius: 8, color: C.cream, padding: "5px 8px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", minWidth: 0 },
   bdayEditRow: { display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderTop: `1px solid ${C.faint}`, background: "#171209" },
   bdayInput: { flex: 1, background: "#0e0c09", border: `1px solid ${C.border}`, borderRadius: 8, color: C.cream, padding: "6px 10px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none" },
   inactiveSection: { marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 12 },
