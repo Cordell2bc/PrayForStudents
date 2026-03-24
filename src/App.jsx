@@ -288,6 +288,7 @@ export default function App() {
   const [editBdayFor, setEditBdayFor] = useState(null);
   const [editNameFor, setEditNameFor] = useState(null);
   const [nameInput, setNameInput] = useState("");
+  const [confirmPromo, setConfirmPromo] = useState(false);
   const [bdayInput, setBdayInput] = useState("");
 
   // Prayer requests
@@ -475,10 +476,13 @@ export default function App() {
     setPeople(prev => prev.map(p => p.id === current.id ? { ...p, prayedAt: null } : p));
   }
 
+  const [addGrade, setAddGrade] = useState("");
+
   function addPerson() {
     if (!addName.trim()) return;
-    setPeople(prev => [...prev, { id: genId(), name: addName.trim(), type: addType, group: addType === "student" ? addGroup : null, active: true, prayedAt: null, prayerRequests: [], birthday: "" }]);
+    setPeople(prev => [...prev, { id: genId(), name: addName.trim(), type: addType, group: addType === "student" ? addGroup : null, grade: addType === "student" && addGrade ? Number(addGrade) : null, active: true, prayedAt: null, prayerRequests: [], birthday: "" }]);
     setAddName("");
+    setAddGrade("");
   }
 
   function cycleGroup(id) {
@@ -508,6 +512,15 @@ export default function App() {
     setPeople(prev => prev.map(p => p.id === id ? { ...p, name: nameInput.trim() } : p));
     setEditNameFor(null);
     setNameInput("");
+  }
+
+  function promoteGrades() {
+    setPeople(prev => prev.map(p => {
+      if (p.type !== "student" || !p.grade) return p;
+      if (p.grade >= 12) return { ...p, active: false, grade: p.grade };
+      return { ...p, grade: p.grade + 1 };
+    }));
+    setConfirmPromo(false);
   }
 
   function addRequest(personId) {
@@ -879,6 +892,12 @@ export default function App() {
               <option value="hs">HS</option>
               <option value="ms">MS</option>
             </select>
+            {addType === "student" && (
+              <select value={addGrade} onChange={e => setAddGrade(e.target.value)} style={S.addTypeSelect}>
+                <option value="">Gr</option>
+                {[6,7,8,9,10,11,12].map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+            )}
             <button onClick={addPerson} style={S.addPersonBtn}><Plus size={16} /></button>
           </div>
 
@@ -913,6 +932,7 @@ export default function App() {
                     <div style={S.personMeta}>
                       <span style={{ ...S.badgeSm, ...(p.type === "leader" ? S.leaderBadgeSm : S.studentBadgeSm) }}>{p.type}</span>
                       {p.group && <span style={{ ...S.badgeSm, ...(p.group === "hs" ? S.hsBadgeSm : S.msBadgeSm) }}>{p.group.toUpperCase()}</span>}
+                      {p.type === "student" && p.grade && <span style={S.gradeBadge}>Gr {p.grade}</span>}
                       {withinWeek(p.prayedAt) && <span style={S.prayedSmall}>✓ prayed</span>}
                       {(p.prayerRequests || []).length > 0 && <span style={S.reqCountBadge}>{p.prayerRequests.length} req</span>}
                       {p.birthday && <span style={S.bdayBadgeSm}><Cake size={9} style={{ marginRight: 3 }} />{formatBirthday(p.birthday)}</span>}
@@ -938,8 +958,35 @@ export default function App() {
                     {p.birthday && <button onClick={() => saveBirthday(p.id, "")} style={S.reqCancelBtn} title="Clear"><X size={12} /></button>}
                   </div>
                 )}
+                {p.type === "student" && (
+                  <div style={S.gradeRow}>
+                    <span style={S.gradeLabel}>Grade</span>
+                    <select value={p.grade || ""} onChange={e => setPeople(prev => prev.map(q => q.id === p.id ? { ...q, grade: e.target.value ? Number(e.target.value) : null } : q))}
+                      style={S.gradeSelect}>
+                      <option value="">—</option>
+                      {[6,7,8,9,10,11,12].map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                  </div>
+                )}
               </div>
             ))}
+          </div>
+
+          {/* End-of-year grade promotion */}
+          <div style={S.promoteSection}>
+            {!confirmPromo ? (
+              <button onClick={() => setConfirmPromo(true)} style={S.promoteBtn}>
+                🎓 End of Year — Promote All Grades
+              </button>
+            ) : (
+              <div style={S.promoteConfirm}>
+                <p style={S.promoteConfirmText}>Move every student up one grade? 12th graders will be made inactive.</p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={promoteGrades} style={S.confirmBtn}>Yes, Promote</button>
+                  <button onClick={() => setConfirmPromo(false)} style={S.cancelBtn}>Cancel</button>
+                </div>
+              </div>
+            )}
           </div>
 
           {people.filter(p => p.active === false).length > 0 && (
@@ -1141,6 +1188,14 @@ const S = {
   bdayBadgeSm: { display: "inline-flex", alignItems: "center", fontSize: 10, color: "#8a7040", background: "#1e1608", padding: "1px 7px", borderRadius: 8 },
   personActions: { display: "flex", gap: 6 },
   iconBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+  gradeBadge: { fontSize: 10, padding: "2px 7px", borderRadius: 8, background: "#1e1a10", color: "#9a8850", fontWeight: 500 },
+  gradeRow: { display: "flex", alignItems: "center", gap: 10, padding: "7px 12px", borderTop: `1px solid ${C.faint}`, background: "#141108" },
+  gradeLabel: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0 },
+  gradeSelect: { background: "#0e0c09", border: `1px solid ${C.border}`, borderRadius: 7, color: C.cream, padding: "4px 8px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", outline: "none" },
+  promoteSection: { marginTop: 4 },
+  promoteBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 10, padding: "11px 16px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", width: "100%", textAlign: "left" },
+  promoteConfirm: { background: "#1a150a", border: `1px solid #3a2e10`, borderRadius: 10, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 },
+  promoteConfirmText: { fontSize: 13, color: C.cream, margin: 0, lineHeight: 1.5 },
   nameRow: { display: "flex", alignItems: "center", gap: 6 },
   editNameBtn: { background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 13, padding: "0 2px", lineHeight: 1 },
   nameEditRow: { display: "flex", alignItems: "center", gap: 6, marginBottom: 2 },
