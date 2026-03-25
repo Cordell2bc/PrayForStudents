@@ -90,8 +90,14 @@ function withinWeek(ts) {
 
 function timeAgo(ts) {
   if (!ts) return null;
-  const diff = Date.now() - ts;
-  const days = Math.floor(diff / 86400000);
+  // Compare calendar dates (midnight-to-midnight) in Eastern time
+  const toETMidnight = t => {
+    const etStr = new Date(t).toLocaleDateString("en-US", { timeZone: "America/New_York" });
+    return new Date(etStr).getTime();
+  };
+  const todayMidnight = toETMidnight(Date.now());
+  const tsMidnight = toETMidnight(ts);
+  const days = Math.round((todayMidnight - tsMidnight) / 86400000);
   if (days === 0) return "today";
   if (days === 1) return "yesterday";
   if (days < 7) return `${days} days ago`;
