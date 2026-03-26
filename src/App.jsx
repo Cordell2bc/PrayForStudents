@@ -114,7 +114,6 @@ function shuffle(arr) {
 }
 
 function ordinal(n) {
-  if (n === "K" || n === 0 || n === "0") return "K";
   const num = Number(n);
   const s = ["th","st","nd","rd"], v = num % 100;
   return num + (s[(v - 20) % 10] || s[v] || s[0]);
@@ -628,7 +627,6 @@ export default function App() {
   function promoteGrades() {
     setPeople(prev => prev.map(p => {
       if (p.type !== "student" || !p.grade) return p;
-      if (p.grade === "K" || p.grade === 0) return { ...p, grade: 1 };
       if (Number(p.grade) >= 12) return { ...p, active: false };
       return { ...p, grade: Number(p.grade) + 1 };
     }));
@@ -1020,7 +1018,7 @@ export default function App() {
             {addType === "student" && (
               <select value={addGrade} onChange={e => setAddGrade(e.target.value)} style={{ ...S.addTypeSelect, flex: 1 }}>
                 <option value="">Grade</option>
-                {["K",1,2,3,4,5,6,7,8,9,10,11,12].map(g => <option key={g} value={g}>{g === "K" ? "Kindergarten" : `Grade ${g}`}</option>)}
+                {[5,6,7,8,9,10,11,12].map(g => <option key={g} value={g}>{`Grade ${g}`}</option>)}
               </select>
             )}
             <button onClick={addPerson} style={S.addPersonBtn}><Plus size={16} /></button>
@@ -1089,7 +1087,7 @@ export default function App() {
                     <select value={p.grade || ""} onChange={e => setPeople(prev => prev.map(q => q.id === p.id ? { ...q, grade: e.target.value ? Number(e.target.value) : null } : q))}
                       style={S.gradeSelect}>
                       <option value="">—</option>
-                      {["K",1,2,3,4,5,6,7,8,9,10,11,12].map(g => <option key={g} value={g}>{g === "K" ? "Kindergarten" : `Grade ${g}`}</option>)}
+                      {[5,6,7,8,9,10,11,12].map(g => <option key={g} value={g}>{`Grade ${g}`}</option>)}
                     </select>
                   </div>
                 )}
