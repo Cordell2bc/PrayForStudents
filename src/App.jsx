@@ -628,7 +628,9 @@ export default function App() {
     setPeople(prev => prev.map(p => {
       if (p.type !== "student" || !p.grade) return p;
       if (Number(p.grade) >= 12) return { ...p, active: false };
-      return { ...p, grade: Number(p.grade) + 1 };
+      const newGrade = Number(p.grade) + 1;
+      const newGroup = Number(p.grade) === 8 ? "hs" : p.group;
+      return { ...p, grade: newGrade, group: newGroup };
     }));
     setConfirmPromo(false);
   }
