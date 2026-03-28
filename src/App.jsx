@@ -407,32 +407,35 @@ export default function App() {
   // Track whether current people state came from a remote poll (no save needed)
   const fromPoll = useRef(false);
   const lastSaved = useRef(null);
+  const pendingChange = useRef(false); // true while user has unsaved changes
 
-  // Save to KV (debounced 1.5s) — only when change came from user, not poll
+  // Save to KV (debounced 500ms — fast enough to beat 15s poll)
   useEffect(() => {
     if (!loaded) return;
     if (fromPoll.current) { fromPoll.current = false; return; }
+    pendingChange.current = true; // mark that user has changes in flight
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      if (people.length === 0) return; // never save empty — safety net
+      if (people.length === 0) { pendingChange.current = false; return; }
       const snapshot = JSON.stringify(people);
-      if (snapshot === lastSaved.current) return; // already saved this
+      if (snapshot === lastSaved.current) { pendingChange.current = false; return; }
       isSaving.current = true;
       await apiSave(people).catch(() => {});
       lastSaved.current = snapshot;
       isSaving.current = false;
-    }, 1500);
+      pendingChange.current = false;
+    }, 500);
     return () => clearTimeout(saveTimer.current);
   }, [people, loaded]);
 
-  // Poll for remote changes every 15s
+  // Poll for remote changes every 15s — skip entirely if user has unsaved changes
   useEffect(() => {
     if (!loaded) return;
     const poll = async () => {
-      if (isSaving.current) return;
+      // Skip poll if user is actively making changes or a save is in flight
+      if (isSaving.current || pendingChange.current) return;
       try {
         const fresh = await apiLoad();
-        // Never replace existing data with an empty array from a poll
         if (fresh.length === 0) return;
         const freshStr = JSON.stringify(fresh);
         setPeople(prev => {
