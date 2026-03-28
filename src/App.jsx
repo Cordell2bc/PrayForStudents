@@ -35,10 +35,15 @@ function setAdminAuthed() {
 async function apiLoad() {
   const res = await fetch("/api/data");
   if (!res.ok) throw new Error("load failed");
-  return await res.json();
+  const data = await res.json();
+  // Treat an empty array from KV as suspicious — never trust it over local state
+  if (!Array.isArray(data)) throw new Error("bad data");
+  return data;
 }
 
 async function apiSave(people) {
+  // Never overwrite KV with an empty list — this prevents accidental data wipes
+  if (!people || people.length === 0) return;
   await fetch("/api/data", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -365,12 +370,12 @@ export default function App() {
     (async () => {
       try {
         const [data, history] = await Promise.all([apiLoad(), apiLoadHistory()]);
-        setPeople(data);
+        // Only set people if we actually got data back
+        if (data.length > 0) setPeople(data);
 
         const currentWeekStart = getWeekStartET();
         const lastSnapshotWeek = history.length > 0 ? history[0].weekStart : null;
 
-        // If we haven't snapshotted this week yet, save last week's count
         if (lastSnapshotWeek !== currentWeekStart) {
           const prevWeekStart = currentWeekStart - 7 * 24 * 60 * 60 * 1000;
           const prevWeekCount = data.filter(p =>
@@ -384,8 +389,18 @@ export default function App() {
         } else {
           setWeekHistory(history);
         }
-      } catch {}
-      setLoaded(true);
+        setLoaded(true);
+      } catch {
+        // Load failed — still mark loaded so UI shows, but DO NOT allow saves
+        // until we have confirmed real data. We retry once after 3s.
+        setTimeout(async () => {
+          try {
+            const data = await apiLoad();
+            if (data.length > 0) setPeople(data);
+          } catch {}
+          setLoaded(true);
+        }, 3000);
+      }
     })();
   }, []);
 
@@ -399,6 +414,7 @@ export default function App() {
     if (fromPoll.current) { fromPoll.current = false; return; }
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
+      if (people.length === 0) return; // never save empty — safety net
       const snapshot = JSON.stringify(people);
       if (snapshot === lastSaved.current) return; // already saved this
       isSaving.current = true;
@@ -416,8 +432,11 @@ export default function App() {
       if (isSaving.current) return;
       try {
         const fresh = await apiLoad();
+        // Never replace existing data with an empty array from a poll
+        if (fresh.length === 0) return;
         const freshStr = JSON.stringify(fresh);
         setPeople(prev => {
+          if (prev.length > 0 && fresh.length === 0) return prev;
           if (JSON.stringify(prev) === freshStr) return prev;
           fromPoll.current = true;
           return fresh;
