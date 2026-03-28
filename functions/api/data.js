@@ -27,7 +27,13 @@ export async function onRequest(context) {
   if (request.method === "POST") {
     const body = await request.text();
     try {
-      JSON.parse(body);
+      const parsed = JSON.parse(body);
+      // Refuse to store an empty array — this prevents accidental data wipes
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        return new Response(JSON.stringify({ error: "Refusing to store empty data" }), {
+          status: 400, headers,
+        });
+      }
       await env.INTERCEDE_KV.put("people", body);
       return new Response(JSON.stringify({ ok: true }), { headers });
     } catch {
