@@ -328,6 +328,23 @@ function Confetti() {
   );
 }
 
+// Isolated ticker — its own state so parent never rerenders on each tick
+function CountdownTicker({ targetTs }) {
+  const [remaining, setRemaining] = React.useState(Math.max(0, targetTs - Date.now()));
+  React.useEffect(() => {
+    const t = setInterval(() => setRemaining(Math.max(0, targetTs - Date.now())), 1000);
+    return () => clearInterval(t);
+  }, [targetTs]);
+  const totalSecs = Math.floor(remaining / 1000);
+  const d = Math.floor(totalSecs / 86400);
+  const h = Math.floor((totalSecs % 86400) / 3600);
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const s = totalSecs % 60;
+  const pad = n => String(n).padStart(2, "0");
+  const label = d > 0 ? `${d}d ${pad(h)}h ${pad(m)}m ${pad(s)}s` : `${pad(h)}h ${pad(m)}m ${pad(s)}s`;
+  return <p style={{ fontSize:13, color:"#7d6a52", margin:0, fontVariantNumeric:"tabular-nums" }}>{label}</p>;
+}
+
 function useCountdown(targetTs) {
   const [remaining, setRemaining] = React.useState(Math.max(0, targetTs - Date.now()));
   React.useEffect(() => {
@@ -349,7 +366,7 @@ function AllPrayedScreen({ prayedCount, total, onWeek }) {
   const [show, setShow] = React.useState(false);
   React.useEffect(() => { setTimeout(() => setShow(true), 100); }, []);
 
-  // Calculate next Monday midnight ET
+  // Calculate next Monday midnight ET — stable, computed once
   const nextMonday = React.useMemo(() => {
     const now = new Date();
     const etStr = now.toLocaleString("en-US", { timeZone: "America/New_York" });
@@ -363,11 +380,11 @@ function AllPrayedScreen({ prayedCount, total, onWeek }) {
     return monET.getTime() + utcOffset;
   }, []);
 
-  const countdown = useCountdown(nextMonday);
   const isMonday = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" })).getDay() === 1;
 
   return (
     <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"0 24px 40px", gap:20, textAlign:"center" }}>
+      {/* Confetti is its own isolated component — never rerenders from countdown ticks */}
       {show && <Confetti />}
       <div style={{ fontSize:56, animation:"celebPulse 2s ease-in-out infinite", lineHeight:1 }}>🙏</div>
       <h2 style={{ fontFamily:"'Cormorant Garamond', serif", fontSize:34, fontWeight:400, color:"#e2cfb0", margin:0, lineHeight:1.2 }}>
@@ -383,7 +400,7 @@ function AllPrayedScreen({ prayedCount, total, onWeek }) {
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:4, alignItems:"center" }}>
           <p style={{ fontSize:13, color:"#7d6a52", margin:0 }}>Check Back Monday</p>
-          <p style={{ fontSize:13, color:"#7d6a52", margin:0, fontVariantNumeric:"tabular-nums" }}>{countdown}</p>
+          <CountdownTicker targetTs={nextMonday} />
         </div>
       )}
       <button onClick={onWeek} style={{ background:"none", border:"1px solid #2e2518", color:"#7d6a52", borderRadius:10, padding:"10px 20px", fontSize:13, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", marginTop:4 }}>
