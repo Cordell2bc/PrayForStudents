@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, Heart, Plus, Trash2, Upload, X, RefreshCw, BookOpen, RotateCcw, Cake } from "lucide-react";
 
 const STORAGE_KEY = "intercede-people-v2";
@@ -298,6 +298,101 @@ function parseCSV(text) {
 
 // ── Component ──────────────────────────────────────────────
 
+function Confetti() {
+  const pieces = Array.from({ length: 38 }, (_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    delay: Math.random() * 2.5,
+    duration: 2.8 + Math.random() * 2,
+    size: 7 + Math.random() * 8,
+    color: ["#c9982a","#e8b84b","#8fc47f","#4e84a0","#c49a6c","#e2cfb0","#72966a"][i % 7],
+    rotate: Math.random() * 360,
+  }));
+  return (
+    <div style={{ position:"fixed", inset:0, pointerEvents:"none", zIndex:50, overflow:"hidden" }}>
+      {pieces.map(p => (
+        <div key={p.id} style={{
+          position:"absolute",
+          left: `${p.x}%`,
+          top: -20,
+          width: p.size,
+          height: p.size * 0.55,
+          background: p.color,
+          borderRadius: 2,
+          transform: `rotate(${p.rotate}deg)`,
+          animation: `confettiFall ${p.duration}s ${p.delay}s ease-in forwards`,
+          opacity: 0,
+        }} />
+      ))}
+    </div>
+  );
+}
+
+function useCountdown(targetTs) {
+  const [remaining, setRemaining] = React.useState(Math.max(0, targetTs - Date.now()));
+  React.useEffect(() => {
+    const t = setInterval(() => setRemaining(Math.max(0, targetTs - Date.now())), 1000);
+    return () => clearInterval(t);
+  }, [targetTs]);
+  const totalSecs = Math.floor(remaining / 1000);
+  const d = Math.floor(totalSecs / 86400);
+  const h = Math.floor((totalSecs % 86400) / 3600);
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const s = totalSecs % 60;
+  const pad = n => String(n).padStart(2, "0");
+  return d > 0
+    ? `${d}d ${pad(h)}h ${pad(m)}m ${pad(s)}s`
+    : `${pad(h)}h ${pad(m)}m ${pad(s)}s`;
+}
+
+function AllPrayedScreen({ prayedCount, total, onWeek }) {
+  const [show, setShow] = React.useState(false);
+  React.useEffect(() => { setTimeout(() => setShow(true), 100); }, []);
+
+  // Calculate next Monday midnight ET
+  const nextMonday = React.useMemo(() => {
+    const now = new Date();
+    const etStr = now.toLocaleString("en-US", { timeZone: "America/New_York" });
+    const etNow = new Date(etStr);
+    const day = etNow.getDay();
+    const daysUntil = day === 1 ? 7 : (8 - day) % 7 || 7;
+    const monET = new Date(etNow);
+    monET.setDate(etNow.getDate() + daysUntil);
+    monET.setHours(0, 0, 0, 0);
+    const utcOffset = now.getTime() - etNow.getTime();
+    return monET.getTime() + utcOffset;
+  }, []);
+
+  const countdown = useCountdown(nextMonday);
+  const isMonday = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" })).getDay() === 1;
+
+  return (
+    <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"0 24px 40px", gap:20, textAlign:"center" }}>
+      {show && <Confetti />}
+      <div style={{ fontSize:56, animation:"celebPulse 2s ease-in-out infinite", lineHeight:1 }}>🙏</div>
+      <h2 style={{ fontFamily:"'Cormorant Garamond', serif", fontSize:34, fontWeight:400, color:"#e2cfb0", margin:0, lineHeight:1.2 }}>
+        Everyone's been<br/>prayed for!
+      </h2>
+      <p style={{ fontSize:14, color:"#c9982a", margin:0, fontWeight:500 }}>
+        {prayedCount} of {total} this week
+      </p>
+      {isMonday ? (
+        <p style={{ fontSize:13, color:"#7d6a52", margin:0, lineHeight:1.7, maxWidth:280 }}>
+          The week just reset — keep the momentum going!
+        </p>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:4, alignItems:"center" }}>
+          <p style={{ fontSize:13, color:"#7d6a52", margin:0 }}>Check Back Monday</p>
+          <p style={{ fontSize:13, color:"#7d6a52", margin:0, fontVariantNumeric:"tabular-nums" }}>{countdown}</p>
+        </div>
+      )}
+      <button onClick={onWeek} style={{ background:"none", border:"1px solid #2e2518", color:"#7d6a52", borderRadius:10, padding:"10px 20px", fontSize:13, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", marginTop:4 }}>
+        View Week Summary →
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
   const [people, setPeople] = useState([]);
   const [loaded, setLoaded] = useState(false);
@@ -360,6 +455,8 @@ export default function App() {
   @keyframes flyOutRight { to { transform: translateX(110%)  rotate(8deg);  opacity: 0; } }
   @keyframes flyInLeft   { from { transform: translateX(110%)  rotate(6deg);  opacity: 0; } to { transform: none; opacity: 1; } }
   @keyframes flyInRight  { from { transform: translateX(-110%) rotate(-6deg); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes confettiFall { 0% { transform: translateY(-20px) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+  @keyframes celebPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
 `;
     document.head.appendChild(style);
     return () => { link.remove(); style.remove(); };
@@ -791,11 +888,15 @@ export default function App() {
           </div>
 
           {deck.length === 0 ? (
-            <div style={S.empty}>
-              <BookOpen size={40} color="#5a4832" />
-              <p style={S.emptyTitle}>No one here yet</p>
-              <p style={S.emptySub}>Add people in the People tab or import a CSV.</p>
-            </div>
+            activePeople.length === 0 ? (
+              <div style={S.empty}>
+                <BookOpen size={40} color="#5a4832" />
+                <p style={S.emptyTitle}>No one here yet</p>
+                <p style={S.emptySub}>Add people in the People tab or import a CSV.</p>
+              </div>
+            ) : (
+              <AllPrayedScreen prayedCount={prayedCount} total={activePeople.length} onWeek={() => setView("week")} />
+            )
           ) : (
             <>
               {!ready ? (
