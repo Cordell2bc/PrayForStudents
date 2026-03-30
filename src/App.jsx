@@ -714,19 +714,19 @@ export default function App() {
 
   function markPrayed() {
     if (!current) return;
-    setPeople(prev => prev.map(p => p.id === current.id ? { ...p, prayedAt: Date.now() } : p));
+    setPeople(prev => prev.map(p => p.id === current.id ? { ...p, prayedAt: Date.now(), updatedAt: Date.now() } : p));
   }
 
   function unmarkPrayed() {
     if (!current) return;
-    setPeople(prev => prev.map(p => p.id === current.id ? { ...p, prayedAt: null } : p));
+    setPeople(prev => prev.map(p => p.id === current.id ? { ...p, prayedAt: null, updatedAt: Date.now() } : p));
   }
 
   const [addGrade, setAddGrade] = useState("");
 
   function addPerson() {
     if (!addName.trim()) return;
-    setPeople(prev => [...prev, { id: genId(), name: addName.trim(), type: addType, group: addType === "student" ? addGroup : null, grade: addType === "student" && addGrade ? Number(addGrade) : null, active: true, prayedAt: null, prayerRequests: [], birthday: "" }]);
+    setPeople(prev => [...prev, { id: genId(), name: addName.trim(), type: addType, group: addType === "student" ? addGroup : null, grade: addType === "student" && addGrade ? Number(addGrade) : null, active: true, prayedAt: null, prayerRequests: [], birthday: "", updatedAt: Date.now() }]);
     setAddName("");
     setAddGrade("");
   }
@@ -734,28 +734,28 @@ export default function App() {
   function cycleGroup(id) {
     setPeople(prev => prev.map(p => {
       if (p.id !== id) return p;
-      if (p.type === "leader") return { ...p, group: p.group === "hs" ? "ms" : p.group === "ms" ? null : "hs" };
-      return { ...p, group: p.group === "hs" ? "ms" : p.group === "ms" ? null : "hs" };
+      if (p.type === "leader") return { ...p, group: p.group === "hs" ? "ms" : p.group === "ms" ? null : "hs", updatedAt: Date.now() };
+      return { ...p, group: p.group === "hs" ? "ms" : p.group === "ms" ? null : "hs", updatedAt: Date.now() };
     }));
   }
 
   function toggleType(id) {
-    setPeople(prev => prev.map(p => p.id === id ? { ...p, type: p.type === "student" ? "leader" : "student" } : p));
+    setPeople(prev => prev.map(p => p.id === id ? { ...p, type: p.type === "student" ? "leader" : "student", updatedAt: Date.now() } : p));
   }
 
-  function deactivate(id) { setPeople(prev => prev.map(p => p.id === id ? { ...p, active: false } : p)); }
-  function restore(id) { setPeople(prev => prev.map(p => p.id === id ? { ...p, active: true } : p)); }
+  function deactivate(id) { setPeople(prev => prev.map(p => p.id === id ? { ...p, active: false, updatedAt: Date.now() } : p)); }
+  function restore(id) { setPeople(prev => prev.map(p => p.id === id ? { ...p, active: true, updatedAt: Date.now() } : p)); }
   function deletePerm(id) { setPeople(prev => prev.filter(p => p.id !== id)); }
 
   function saveBirthday(id, val) {
-    setPeople(prev => prev.map(p => p.id === id ? { ...p, birthday: val } : p));
+    setPeople(prev => prev.map(p => p.id === id ? { ...p, birthday: val, updatedAt: Date.now() } : p));
     setEditBdayFor(null);
     setBdayInput("");
   }
 
   function saveName(id) {
     if (!nameInput.trim()) return;
-    setPeople(prev => prev.map(p => p.id === id ? { ...p, name: nameInput.trim() } : p));
+    setPeople(prev => prev.map(p => p.id === id ? { ...p, name: nameInput.trim(), updatedAt: Date.now() } : p));
     setEditNameFor(null);
     setNameInput("");
   }
@@ -773,12 +773,12 @@ export default function App() {
 
   function addRequest(personId) {
     if (!reqText.trim()) return;
-    setPeople(prev => prev.map(p => p.id === personId ? { ...p, prayerRequests: [...(p.prayerRequests || []), reqText.trim()] } : p));
+    setPeople(prev => prev.map(p => p.id === personId ? { ...p, prayerRequests: [...(p.prayerRequests || []), reqText.trim()], updatedAt: Date.now() } : p));
     setReqText(""); setReqFor(null);
   }
 
   function removeRequest(personId, idx) {
-    setPeople(prev => prev.map(p => p.id === personId ? { ...p, prayerRequests: p.prayerRequests.filter((_, i) => i !== idx) } : p));
+    setPeople(prev => prev.map(p => p.id === personId ? { ...p, prayerRequests: p.prayerRequests.filter((_, i) => i !== idx), updatedAt: Date.now() } : p));
   }
 
   function handleFile(e) {
@@ -1226,7 +1226,7 @@ export default function App() {
                 {p.type === "student" && (
                   <div style={S.gradeRow}>
                     <span style={S.gradeLabel}>Grade</span>
-                    <select value={p.grade || ""} onChange={e => setPeople(prev => prev.map(q => q.id === p.id ? { ...q, grade: e.target.value ? Number(e.target.value) : null } : q))}
+                    <select value={p.grade || ""} onChange={e => setPeople(prev => prev.map(q => q.id === p.id ? { ...q, grade: e.target.value ? Number(e.target.value) : null, updatedAt: Date.now() } : q))}
                       style={S.gradeSelect}>
                       <option value="">—</option>
                       {[5,6,7,8,9,10,11,12].map(g => <option key={g} value={g}>{`Grade ${g}`}</option>)}
