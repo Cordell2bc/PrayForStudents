@@ -723,10 +723,10 @@ export default function App() {
     setKeepPrayingId(null);
   }
 
-  function startKeepPraying() {
-    const pool = activePeople;
-    if (!pool.length) return;
-    const pick = pool[Math.floor(Math.random() * pool.length)];
+  function startKeepPraying(pool) {
+    const p = pool || activePeople;
+    if (!p.length) return;
+    const pick = p[Math.floor(Math.random() * p.length)];
     setKeepPrayingId(pick.id);
     setReqFor(null);
   }
@@ -932,7 +932,7 @@ export default function App() {
                 <Heart size={36} fill={C.prayedGreen} color={C.prayedGreen} />
                 <p style={S.emptyTitle}>All prayed for!</p>
                 <p style={S.emptySub}>Everyone in this group has been prayed for this week.</p>
-                <button onClick={startKeepPraying} style={{ background:`linear-gradient(135deg, #c9982a, #b8821e)`, border:"none", color:"#0e0c09", borderRadius:12, padding:"13px 28px", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", boxShadow:"0 4px 20px rgba(201,152,42,0.3)", marginTop:8 }}>
+                <button onClick={() => startKeepPraying(getFiltered())} style={{ background:`linear-gradient(135deg, #c9982a, #b8821e)`, border:"none", color:"#0e0c09", borderRadius:12, padding:"13px 28px", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", boxShadow:"0 4px 20px rgba(201,152,42,0.3)", marginTop:8 }}>
                   Keep Praying
                 </button>
               </div>
