@@ -1128,7 +1128,7 @@ export default function App() {
               : prayedThis.map(p => (
                 <div key={p.id} onClick={() => goToPerson(p.id)} style={{ ...S.weekRow, cursor: "pointer" }}>
                   <div>
-                    <div style={S.weekName}>{p.name}{(p.prayCount || 1) > 1 ? <span style={{ fontSize:11, color:C.gold, marginLeft:6, fontWeight:600 }}>x{p.prayCount}</span> : null}</div>
+                    <div style={{ ...S.weekName, display:"flex", alignItems:"center", gap:6 }}>{p.name}{(p.prayCount || 0) >= 2 ? <span style={{ fontSize:11, color:C.gold, fontWeight:700, background:"#241c0a", padding:"1px 6px", borderRadius:8 }}>x{p.prayCount}</span> : null}</div>
                     <div style={S.weekMeta}>{timeAgo(p.prayedAt)}</div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
