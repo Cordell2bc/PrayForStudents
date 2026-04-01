@@ -1047,7 +1047,7 @@ export default function App() {
                     <button onClick={() => navWithAnim(1)} style={S.navArrow}><ChevronRight size={22} /></button>
                   </div>
 
-                  {withinWeek(current?.prayedAt) ? (
+                  {withinWeek(current?.prayedAt) && !keepPrayingPerson ? (
                     <div style={S.prayedActions}>
                       <div style={S.prayedConfirm}><Heart size={16} fill="#9dc88d" color="#9dc88d" style={{ marginRight: 7 }} /> Prayed!</div>
                       {!pinnedPerson && <button onClick={unmarkPrayed} style={S.undoBtn}>Undo</button>}
@@ -1055,7 +1055,7 @@ export default function App() {
                     </div>
                   ) : (
                     <button onClick={markPrayed} style={S.prayBtn}>
-                      <Heart size={16} style={{ marginRight: 8 }} /> Mark as Prayed
+                      <Heart size={16} style={{ marginRight: 8 }} /> {keepPrayingPerson ? "Pray Again" : "Mark as Prayed"}
                     </button>
                   )}
 
