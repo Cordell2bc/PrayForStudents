@@ -362,7 +362,7 @@ function useCountdown(targetTs) {
     : `${pad(h)}h ${pad(m)}m ${pad(s)}s`;
 }
 
-function AllPrayedScreen({ prayedCount, total, onWeek }) {
+function AllPrayedScreen({ prayedCount, praySessionCount, total, onWeek, onKeepPraying }) {
   const [show, setShow] = React.useState(false);
   React.useEffect(() => { setTimeout(() => setShow(true), 100); }, []);
 
@@ -391,7 +391,7 @@ function AllPrayedScreen({ prayedCount, total, onWeek }) {
         Everyone's been<br/>prayed for!
       </h2>
       <p style={{ fontSize:14, color:"#c9982a", margin:0, fontWeight:500 }}>
-        {prayedCount} of {total} this week
+        {praySessionCount > prayedCount ? praySessionCount : prayedCount} of {total} this week
       </p>
       {isMonday ? (
         <p style={{ fontSize:13, color:"#7d6a52", margin:0, lineHeight:1.7, maxWidth:280 }}>
@@ -403,7 +403,10 @@ function AllPrayedScreen({ prayedCount, total, onWeek }) {
           <CountdownTicker targetTs={nextMonday} />
         </div>
       )}
-      <button onClick={onWeek} style={{ background:"none", border:"1px solid #2e2518", color:"#7d6a52", borderRadius:10, padding:"10px 20px", fontSize:13, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", marginTop:4 }}>
+      <button onClick={onKeepPraying} style={{ background:`linear-gradient(135deg, #c9982a, #b8821e)`, border:"none", color:"#0e0c09", borderRadius:12, padding:"13px 28px", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", boxShadow:"0 4px 20px rgba(201,152,42,0.3)" }}>
+        Keep Praying
+      </button>
+      <button onClick={onWeek} style={{ background:"none", border:"1px solid #2e2518", color:"#7d6a52", borderRadius:10, padding:"10px 20px", fontSize:13, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
         View Week Summary →
       </button>
     </div>
@@ -428,6 +431,7 @@ export default function App() {
   const [swipeDelta, setSwipeDelta] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const [cardAnim, setCardAnim] = useState("idle"); // idle | exiting-left | exiting-right | entering-left | entering-right
+  const [keepPrayingId, setKeepPrayingId] = useState(null); // local only, never saved
 
   // People mgmt
   const [addName, setAddName] = useState("");
@@ -492,9 +496,9 @@ export default function App() {
 
         if (lastSnapshotWeek !== currentWeekStart) {
           const prevWeekStart = currentWeekStart - 7 * 24 * 60 * 60 * 1000;
-          const prevWeekCount = data.filter(p =>
-            p.prayedAt && p.prayedAt >= prevWeekStart && p.prayedAt < currentWeekStart
-          ).length;
+          const prevWeekCount = data
+            .filter(p => p.prayedAt && p.prayedAt >= prevWeekStart && p.prayedAt < currentWeekStart)
+            .reduce((sum, p) => sum + (p.prayCount || 1), 0);
           const total = data.filter(p => p.active !== false).length;
           const newEntry = { weekStart: currentWeekStart, prevWeekStart, count: prevWeekCount, total };
           const updated = [newEntry, ...history].slice(0, 3);
@@ -576,7 +580,6 @@ export default function App() {
     if (filter === "ms-students") list = list.filter(p => p.type === "student" && p.group === "ms");
     if (filter === "hs-leaders") list = list.filter(p => p.type === "leader" && p.group === "hs");
     if (filter === "ms-leaders") list = list.filter(p => p.type === "leader" && p.group === "ms");
-    if (filter === "unprayed") list = list.filter(p => !withinWeek(p.prayedAt));
     return list;
   }, [people, filter]);
 
@@ -591,7 +594,6 @@ export default function App() {
     if (f === "ms-students") list = list.filter(p => p.type === "student" && p.group === "ms");
     if (f === "hs-leaders") list = list.filter(p => p.type === "leader" && p.group === "hs");
     if (f === "ms-leaders") list = list.filter(p => p.type === "leader" && p.group === "ms");
-    if (f === "unprayed") list = list.filter(p => !withinWeek(p.prayedAt));
     // Always exclude prayed-this-week from swipe deck
     const unprayed = list.filter(p => !withinWeek(p.prayedAt));
     setDeckIds(shuffle(unprayed.map(p => p.id)));
@@ -621,8 +623,11 @@ export default function App() {
   })();
 
   const pinnedPerson = pinnedPersonId ? activePeople.find(p => p.id === pinnedPersonId) ?? null : null;
-  const current = pinnedPerson ?? deck[cardIdx] ?? null;
-  const prayedCount = activePeople.filter(p => withinWeek(p.prayedAt)).length;
+  const keepPrayingPerson = keepPrayingId ? activePeople.find(p => p.id === keepPrayingId) ?? null : null;
+  const current = keepPrayingPerson ?? pinnedPerson ?? deck[cardIdx] ?? null;
+  const prayedPeople = activePeople.filter(p => withinWeek(p.prayedAt));
+  const prayedCount = prayedPeople.length; // unique people prayed
+  const praySessionCount = prayedPeople.reduce((sum, p) => sum + (p.prayCount || 1), 0); // total sessions this week
   const upcomingBdays = getUpcomingBirthdays(activePeople);
   const urgentBdays = upcomingBdays.filter(b => b.diff <= 3).length;
 
@@ -714,7 +719,16 @@ export default function App() {
 
   function markPrayed() {
     if (!current) return;
-    setPeople(prev => prev.map(p => p.id === current.id ? { ...p, prayedAt: Date.now(), updatedAt: Date.now() } : p));
+    setPeople(prev => prev.map(p => p.id === current.id ? { ...p, prayedAt: Date.now(), prayCount: (p.prayCount || 0) + 1, updatedAt: Date.now() } : p));
+    setKeepPrayingId(null);
+  }
+
+  function startKeepPraying() {
+    const pool = activePeople;
+    if (!pool.length) return;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    setKeepPrayingId(pick.id);
+    setReqFor(null);
   }
 
   function unmarkPrayed() {
@@ -841,14 +855,14 @@ export default function App() {
         </div>
         <div style={{ ...S.weekBar, cursor: "pointer" }} onClick={() => setView("week")}>
           <Heart size={13} color="#d4916a" fill="#d4916a" />
-          <span style={S.weekText}>{prayedCount} / {activePeople.length} this week</span>
+          <span style={S.weekText}>{praySessionCount > prayedCount ? praySessionCount : prayedCount} / {activePeople.length} this week</span>
           {urgentBdays > 0 && <span style={S.bdayAlert}><span style={{lineHeight:1}}>🎂</span><span style={{lineHeight:1}}>{urgentBdays}</span></span>}
         </div>
       </header>
 
       {/* Progress */}
       <div style={S.progressTrack}>
-        <div style={{ ...S.progressFill, width: activePeople.length ? `${(prayedCount / activePeople.length) * 100}%` : "0%" }} />
+        <div style={{ ...S.progressFill, width: activePeople.length ? `${Math.min(100, (praySessionCount / activePeople.length) * 100)}%` : "0%" }} />
       </div>
 
       {/* Tabs */}
@@ -897,26 +911,36 @@ export default function App() {
               <option value="ms-students">MS Students</option>
               <option value="hs-students">HS Students</option>
               <option value="leaders">Leaders</option>
-              <option value="unprayed">Unprayed</option>
             </select>
             {order === "random" && (
               <button onClick={() => buildDeck()} style={S.reshuffleBtn} title="Reshuffle"><RotateCcw size={14} /></button>
             )}
           </div>
 
-          {deck.length === 0 ? (
+          {keepPrayingPerson ? null : null /* keepPraying handled below */}
+          {deck.length === 0 && !keepPrayingPerson ? (
             activePeople.length === 0 ? (
               <div style={S.empty}>
                 <BookOpen size={40} color="#5a4832" />
                 <p style={S.emptyTitle}>No one here yet</p>
                 <p style={S.emptySub}>Add people in the People tab or import a CSV.</p>
               </div>
+            ) : filter === "all" ? (
+              <AllPrayedScreen prayedCount={prayedCount} praySessionCount={praySessionCount} total={activePeople.length} onWeek={() => setView("week")} onKeepPraying={startKeepPraying} />
             ) : (
-              <AllPrayedScreen prayedCount={prayedCount} total={activePeople.length} onWeek={() => setView("week")} />
+              <div style={S.empty}>
+                <Heart size={36} fill={C.prayedGreen} color={C.prayedGreen} />
+                <p style={S.emptyTitle}>All prayed for!</p>
+                <p style={S.emptySub}>Everyone in this group has been prayed for this week.</p>
+                <button onClick={startKeepPraying} style={{ background:`linear-gradient(135deg, #c9982a, #b8821e)`, border:"none", color:"#0e0c09", borderRadius:12, padding:"13px 28px", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", boxShadow:"0 4px 20px rgba(201,152,42,0.3)", marginTop:8 }}>
+                  Keep Praying
+                </button>
+              </div>
             )
-          ) : (
+          ) : null}
+          {(deck.length > 0 || keepPrayingPerson) ? (
             <>
-              {!ready ? (
+              {!ready && !keepPrayingPerson ? (
                 /* ── Tap to Begin splash ── */
                 <div
                   style={S.cardOuter}
@@ -1104,7 +1128,7 @@ export default function App() {
               : prayedThis.map(p => (
                 <div key={p.id} onClick={() => goToPerson(p.id)} style={{ ...S.weekRow, cursor: "pointer" }}>
                   <div>
-                    <div style={S.weekName}>{p.name}</div>
+                    <div style={S.weekName}>{p.name}{(p.prayCount || 1) > 1 ? <span style={{ fontSize:11, color:C.gold, marginLeft:6, fontWeight:600 }}>x{p.prayCount}</span> : null}</div>
                     <div style={S.weekMeta}>{timeAgo(p.prayedAt)}</div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
