@@ -431,7 +431,6 @@ export default function App() {
   const [swipeDelta, setSwipeDelta] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const [cardAnim, setCardAnim] = useState("idle"); // idle | exiting-left | exiting-right | entering-left | entering-right
-  const [keepPrayingId, setKeepPrayingId] = useState(null); // local only, never saved
 
   // People mgmt
   const [addName, setAddName] = useState("");
@@ -623,8 +622,7 @@ export default function App() {
   })();
 
   const pinnedPerson = pinnedPersonId ? activePeople.find(p => p.id === pinnedPersonId) ?? null : null;
-  const keepPrayingPerson = keepPrayingId ? activePeople.find(p => p.id === keepPrayingId) ?? null : null;
-  const current = keepPrayingPerson ?? pinnedPerson ?? deck[cardIdx] ?? null;
+  const current = pinnedPerson ?? deck[cardIdx] ?? null;
   const prayedPeople = activePeople.filter(p => withinWeek(p.prayedAt));
   const prayedCount = prayedPeople.length; // unique people prayed
   const praySessionCount = prayedPeople.reduce((sum, p) => sum + (p.prayCount || 1), 0); // total sessions this week
@@ -720,7 +718,6 @@ export default function App() {
   function markPrayed() {
     if (!current) return;
     setPeople(prev => prev.map(p => p.id === current.id ? { ...p, prayedAt: Date.now(), prayCount: (p.prayCount || 0) + 1, updatedAt: Date.now() } : p));
-    setKeepPrayingId(null);
     setPinnedPersonId(null);
   }
 
@@ -728,9 +725,9 @@ export default function App() {
     const p = pool || activePeople;
     if (!p.length) return;
     const pick = p[Math.floor(Math.random() * p.length)];
-    setKeepPrayingId(pick.id);
+    setPinnedPersonId(pick.id);
     setReqFor(null);
-    setReady(true); // ensure card shows even if tap-to-begin hasn't been dismissed yet
+    setReady(true);
   }
 
   function unmarkPrayed() {
@@ -919,8 +916,7 @@ export default function App() {
             )}
           </div>
 
-          {keepPrayingPerson ? null : null /* keepPraying handled below */}
-          {deck.length === 0 && !keepPrayingPerson ? (
+          {deck.length === 0 && !pinnedPerson ? (
             activePeople.length === 0 ? (
               <div style={S.empty}>
                 <BookOpen size={40} color="#5a4832" />
@@ -940,9 +936,9 @@ export default function App() {
               </div>
             )
           ) : null}
-          {(deck.length > 0 || keepPrayingPerson) ? (
+          {(deck.length > 0 || pinnedPerson) ? (
             <>
-              {!ready && !keepPrayingPerson ? (
+              {!ready && !pinnedPerson ? (
                 /* ── Tap to Begin splash ── */
                 <div
                   style={S.cardOuter}
@@ -1049,7 +1045,7 @@ export default function App() {
                     <button onClick={() => navWithAnim(1)} style={S.navArrow}><ChevronRight size={22} /></button>
                   </div>
 
-                  {withinWeek(current?.prayedAt) && !keepPrayingPerson && !pinnedPerson ? (
+                  {withinWeek(current?.prayedAt) && !pinnedPerson ? (
                     <div style={S.prayedActions}>
                       <div style={S.prayedConfirm}><Heart size={16} fill="#9dc88d" color="#9dc88d" style={{ marginRight: 7 }} /> Prayed!</div>
                       {!pinnedPerson && <button onClick={unmarkPrayed} style={S.undoBtn}>Undo</button>}
@@ -1057,7 +1053,7 @@ export default function App() {
                     </div>
                   ) : (
                     <button onClick={markPrayed} style={S.prayBtn}>
-                      <Heart size={16} style={{ marginRight: 8 }} /> {keepPrayingPerson || (pinnedPerson && withinWeek(current?.prayedAt)) ? "Pray Again" : "Mark as Prayed"}
+                      <Heart size={16} style={{ marginRight: 8 }} /> {pinnedPerson && withinWeek(current?.prayedAt) ? "Pray Again" : "Mark as Prayed"}
                     </button>
                   )}
 
