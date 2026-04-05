@@ -661,7 +661,17 @@ export default function App() {
     const enterAnim = dir > 0 ? "entering-left" : "entering-right";
     setCardAnim(exitAnim);
     setTimeout(() => {
-      nav(dir);
+      if (keepPrayingMode) {
+        // In keep praying mode the deck is empty — pick a new random person
+        const p = activePeople;
+        if (p.length) {
+          const pick = p[Math.floor(Math.random() * p.length)];
+          setPinnedPersonId(pick.id);
+          setReqFor(null);
+        }
+      } else {
+        nav(dir);
+      }
       setCardAnim(enterAnim);
       setTimeout(() => setCardAnim("idle"), 320);
     }, 200);
