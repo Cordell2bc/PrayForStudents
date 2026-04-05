@@ -736,6 +736,7 @@ export default function App() {
     if (!current) return;
     setPeople(prev => prev.map(p => p.id === current.id ? { ...p, prayedAt: Date.now(), prayCount: (p.prayCount || 0) + 1, updatedAt: Date.now() } : p));
     setPinnedPersonId(null);
+    setKeepPrayingMode(false); // return to celebration screen after Pray Again
   }
 
   function startKeepPraying(pool) {
