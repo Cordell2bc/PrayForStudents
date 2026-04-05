@@ -730,6 +730,7 @@ export default function App() {
     const pick = p[Math.floor(Math.random() * p.length)];
     setKeepPrayingId(pick.id);
     setReqFor(null);
+    setReady(true); // ensure card shows even if tap-to-begin hasn't been dismissed yet
   }
 
   function unmarkPrayed() {
