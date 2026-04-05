@@ -856,14 +856,14 @@ export default function App() {
         </div>
         <div style={{ ...S.weekBar, cursor: "pointer" }} onClick={() => setView("week")}>
           <Heart size={13} color="#d4916a" fill="#d4916a" />
-          <span style={S.weekText}>{praySessionCount > prayedCount ? praySessionCount : prayedCount} / {activePeople.length} this week</span>
+          <span style={S.weekText}>{prayedCount >= activePeople.length ? praySessionCount : prayedCount} / {activePeople.length} this week</span>
           {urgentBdays > 0 && <span style={S.bdayAlert}><span style={{lineHeight:1}}>🎂</span><span style={{lineHeight:1}}>{urgentBdays}</span></span>}
         </div>
       </header>
 
       {/* Progress */}
       <div style={S.progressTrack}>
-        <div style={{ ...S.progressFill, width: activePeople.length ? `${Math.min(100, (praySessionCount / activePeople.length) * 100)}%` : "0%" }} />
+        <div style={{ ...S.progressFill, width: activePeople.length ? `${Math.min(100, ((prayedCount >= activePeople.length ? praySessionCount : prayedCount) / activePeople.length) * 100)}%` : "0%" }} />
       </div>
 
       {/* Tabs */}
