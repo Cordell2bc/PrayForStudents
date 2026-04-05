@@ -403,7 +403,7 @@ function AllPrayedScreen({ prayedCount, praySessionCount, total, onWeek, onKeepP
           <CountdownTicker targetTs={nextMonday} />
         </div>
       )}
-      <button onClick={onKeepPraying} style={{ background:`linear-gradient(135deg, #c9982a, #b8821e)`, border:"none", color:"#0e0c09", borderRadius:12, padding:"13px 28px", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", boxShadow:"0 4px 20px rgba(201,152,42,0.3)" }}>
+      <button onClick={() => onKeepPraying()} style={{ background:`linear-gradient(135deg, #c9982a, #b8821e)`, border:"none", color:"#0e0c09", borderRadius:12, padding:"13px 28px", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", boxShadow:"0 4px 20px rgba(201,152,42,0.3)" }}>
         Keep Praying
       </button>
       <button onClick={onWeek} style={{ background:"none", border:"1px solid #2e2518", color:"#7d6a52", borderRadius:10, padding:"10px 20px", fontSize:13, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
