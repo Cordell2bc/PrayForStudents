@@ -423,6 +423,7 @@ export default function App() {
   const [deckIds, setDeckIds] = useState([]);
   const [ready, setReady] = useState(() => !shouldShowTap());
   const [pinnedPersonId, setPinnedPersonId] = useState(null);
+  const [keepPrayingMode, setKeepPrayingMode] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   // Swipe
@@ -598,6 +599,7 @@ export default function App() {
     setDeckIds(shuffle(unprayed.map(p => p.id)));
     setCardIdx(0);
     setPinnedPersonId(null);
+    setKeepPrayingMode(false);
     setDropdownOpen(false);
     if (shouldShowTap()) setReady(false); else setReady(true);
   }, [people, filter]);
@@ -725,6 +727,7 @@ export default function App() {
     const p = pool || activePeople;
     if (!p.length) return;
     const pick = p[Math.floor(Math.random() * p.length)];
+    setKeepPrayingMode(true);
     setPinnedPersonId(pick.id);
     setReqFor(null);
     setReady(true);
@@ -916,7 +919,7 @@ export default function App() {
             )}
           </div>
 
-          {deck.length === 0 && !pinnedPerson ? (
+          {deck.length === 0 && !pinnedPerson && !keepPrayingMode ? (
             activePeople.length === 0 ? (
               <div style={S.empty}>
                 <BookOpen size={40} color="#5a4832" />
@@ -936,7 +939,7 @@ export default function App() {
               </div>
             )
           ) : null}
-          {(deck.length > 0 || pinnedPerson) ? (
+          {(deck.length > 0 || pinnedPerson || keepPrayingMode) ? (
             <>
               {!ready && !pinnedPerson ? (
                 /* ── Tap to Begin splash ── */
@@ -1045,7 +1048,7 @@ export default function App() {
                     <button onClick={() => navWithAnim(1)} style={S.navArrow}><ChevronRight size={22} /></button>
                   </div>
 
-                  {withinWeek(current?.prayedAt) && !pinnedPerson ? (
+                  {withinWeek(current?.prayedAt) && !pinnedPerson && !keepPrayingMode ? (
                     <div style={S.prayedActions}>
                       <div style={S.prayedConfirm}><Heart size={16} fill="#9dc88d" color="#9dc88d" style={{ marginRight: 7 }} /> Prayed!</div>
                       {!pinnedPerson && <button onClick={unmarkPrayed} style={S.undoBtn}>Undo</button>}
@@ -1053,7 +1056,7 @@ export default function App() {
                     </div>
                   ) : (
                     <button onClick={markPrayed} style={S.prayBtn}>
-                      <Heart size={16} style={{ marginRight: 8 }} /> {pinnedPerson && withinWeek(current?.prayedAt) ? "Pray Again" : "Mark as Prayed"}
+                      <Heart size={16} style={{ marginRight: 8 }} /> {(pinnedPerson || keepPrayingMode) && withinWeek(current?.prayedAt) ? "Pray Again" : "Mark as Prayed"}
                     </button>
                   )}
 
