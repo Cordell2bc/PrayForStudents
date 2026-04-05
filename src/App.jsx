@@ -717,7 +717,12 @@ export default function App() {
       const dir = delta < 0 ? "left" : "right";
       setCardAnim(`exiting-${dir}`);
       setTimeout(() => {
-        nav(delta < 0 ? 1 : -1);
+        if (keepPrayingMode) {
+          const p = activePeople;
+          if (p.length) { setPinnedPersonId(p[Math.floor(Math.random() * p.length)].id); setReqFor(null); }
+        } else {
+          nav(delta < 0 ? 1 : -1);
+        }
         setSwipeDelta(0);
         setCardAnim(`entering-${dir === "left" ? "left" : "right"}`);
         setTimeout(() => setCardAnim("idle"), 320);
