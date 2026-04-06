@@ -498,7 +498,7 @@ export default function App() {
           const prevWeekStart = currentWeekStart - 7 * 24 * 60 * 60 * 1000;
           const prevWeekCount = data
             .filter(p => p.prayedAt && p.prayedAt >= prevWeekStart && p.prayedAt < currentWeekStart)
-            .reduce((sum, p) => sum + (p.prayCount || 1), 0);
+            .reduce((sum, p) => sum + (p.weekPrayCount || 1), 0);
           const total = data.filter(p => p.active !== false).length;
           const newEntry = { weekStart: currentWeekStart, prevWeekStart, count: prevWeekCount, total };
           const updated = [newEntry, ...history].slice(0, 3);
@@ -627,7 +627,7 @@ export default function App() {
   const current = pinnedPerson ?? deck[cardIdx] ?? null;
   const prayedPeople = activePeople.filter(p => withinWeek(p.prayedAt));
   const prayedCount = prayedPeople.length; // unique people prayed
-  const praySessionCount = prayedPeople.reduce((sum, p) => sum + (p.prayCount || 1), 0); // total sessions this week
+  const praySessionCount = prayedPeople.reduce((sum, p) => sum + (p.weekPrayCount || 1), 0); // total sessions this week
   const upcomingBdays = getUpcomingBirthdays(activePeople);
   const urgentBdays = upcomingBdays.filter(b => b.diff <= 3).length;
 
@@ -734,7 +734,12 @@ export default function App() {
 
   function markPrayed() {
     if (!current) return;
-    setPeople(prev => prev.map(p => p.id === current.id ? { ...p, prayedAt: Date.now(), prayCount: (p.prayCount || 0) + 1, updatedAt: Date.now() } : p));
+    setPeople(prev => prev.map(p => {
+      if (p.id !== current.id) return p;
+      const weekStart = getWeekStartET();
+      const inSameWeek = p.prayedAt && p.prayedAt >= weekStart;
+      return { ...p, prayedAt: Date.now(), prayCount: (p.prayCount || 0) + 1, weekPrayCount: inSameWeek ? (p.weekPrayCount || 1) + 1 : 1, updatedAt: Date.now() };
+    }));
     setPinnedPersonId(null);
     setKeepPrayingMode(false); // return to celebration screen after Pray Again
   }
@@ -1145,7 +1150,7 @@ export default function App() {
               : prayedThis.map(p => (
                 <div key={p.id} onClick={() => goToPerson(p.id)} style={{ ...S.weekRow, cursor: "pointer" }}>
                   <div>
-                    <div style={{ ...S.weekName, display:"flex", alignItems:"center", gap:6 }}>{p.name}{(p.prayCount || 0) >= 2 ? <span style={{ fontSize:11, color:C.gold, fontWeight:700, background:"#241c0a", padding:"1px 6px", borderRadius:8 }}>x{p.prayCount}</span> : null}</div>
+                    <div style={{ ...S.weekName, display:"flex", alignItems:"center", gap:6 }}>{p.name}{(p.weekPrayCount || 0) >= 2 ? <span style={{ fontSize:11, color:C.gold, fontWeight:700, background:"#241c0a", padding:"1px 6px", borderRadius:8 }}>x{p.weekPrayCount}</span> : null}</div>
                     <div style={S.weekMeta}>{timeAgo(p.prayedAt)}</div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
