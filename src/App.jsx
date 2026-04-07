@@ -66,8 +66,9 @@ async function apiSaveHistory(history) {
 }
 
 function getWeekLabel(weekStartTs) {
+  // Show the Monday date of that week clearly
   const d = new Date(weekStartTs);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" });
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" });
 }
 
 function genId() {
@@ -496,9 +497,9 @@ export default function App() {
 
         if (lastSnapshotWeek !== currentWeekStart) {
           const prevWeekStart = currentWeekStart - 7 * 24 * 60 * 60 * 1000;
-          const prevWeekCount = data
-            .filter(p => p.prayedAt && p.prayedAt >= prevWeekStart && p.prayedAt < currentWeekStart)
-            .reduce((sum, p) => sum + (p.weekPrayCount || 1), 0);
+          // Count unique people prayed for last week (prayedAt falls in the previous week window)
+          const prevWeekPrayed = data.filter(p => p.prayedAt && p.prayedAt >= prevWeekStart && p.prayedAt < currentWeekStart);
+          const prevWeekCount = prevWeekPrayed.length;
           const total = data.filter(p => p.active !== false).length;
           const newEntry = { weekStart: currentWeekStart, prevWeekStart, count: prevWeekCount, total };
           const updated = [newEntry, ...history].slice(0, 3);
@@ -1327,9 +1328,10 @@ export default function App() {
               <p style={S.reportEmpty}>Data will appear here after the first Monday reset.</p>
             ) : weekHistory.map((w, i) => {
               const pct = w.total > 0 ? Math.round((w.count / w.total) * 100) : 0;
+              const weekEndTs = w.weekStart - 1; // Sunday before current week = last day of reported week
               const label = i === 0
-                ? `Week of ${getWeekLabel(w.prevWeekStart)} (last week)`
-                : `Week of ${getWeekLabel(w.prevWeekStart)}`;
+                ? `${getWeekLabel(w.prevWeekStart)} – ${getWeekLabel(weekEndTs)} (last week)`
+                : `${getWeekLabel(w.prevWeekStart)} – ${getWeekLabel(weekEndTs)}`;
               return (
                 <div key={w.weekStart} style={S.reportRow}>
                   <div style={S.reportRowTop}>
