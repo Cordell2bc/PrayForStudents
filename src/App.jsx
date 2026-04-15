@@ -142,8 +142,8 @@ function getBirthdayStatus(birthday) {
   let bday = birthdayInYear(month, day, today.getFullYear());
   if (bday < todayMidnight) bday = birthdayInYear(month, day, today.getFullYear() + 1);
   const diff = Math.round((bday - todayMidnight) / 86400000);
-  if (diff === 0) return { label: "🎂 Birthday today!", urgent: true };
-  if (diff === 1) return { label: "🎂 Birthday tomorrow!", urgent: true };
+  if (diff === 0) return { label: "🎂 Birthday today!", urgent: true, today: true };
+  if (diff === 1) return { label: "🎂 Birthday tomorrow!", urgent: true, today: false };
   if (diff <= 7) return { label: `🎂 Birthday in ${diff} days`, urgent: false };
   return null;
 }
@@ -479,6 +479,8 @@ export default function App() {
   @keyframes flyInRight  { from { transform: translateX(-110%) rotate(-6deg); opacity: 0; } to { transform: none; opacity: 1; } }
   @keyframes confettiFall { 0% { transform: translateY(-20px) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
   @keyframes celebPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+  @keyframes bdayGlow { 0%,100%{box-shadow:0 0 8px 2px #c9982a66, 0 0 0 0 #c9982a00} 50%{box-shadow:0 0 18px 6px #c9982aaa, 0 0 32px 12px #c9982a33} }
+  @keyframes bdaySpin { 0%{transform:rotate(-8deg) scale(1.08)} 50%{transform:rotate(8deg) scale(1.15)} 100%{transform:rotate(-8deg) scale(1.08)} }
 `;
     document.head.appendChild(style);
     return () => { link.remove(); style.remove(); };
@@ -597,7 +599,14 @@ export default function App() {
     if (f === "ms-leaders") list = list.filter(p => p.type === "leader" && p.group === "ms");
     // Always exclude prayed-this-week from swipe deck
     const unprayed = list.filter(p => !withinWeek(p.prayedAt));
-    setDeckIds(shuffle(unprayed.map(p => p.id)));
+    const shuffled = shuffle(unprayed.map(p => p.id));
+    // Move today's birthday person to front if they're in the deck
+    const todayBdayId = unprayed.find(p => getBirthdayStatus(p.birthday)?.today)?.id;
+    if (todayBdayId) {
+      const idx = shuffled.indexOf(todayBdayId);
+      if (idx > 0) { shuffled.splice(idx, 1); shuffled.unshift(todayBdayId); }
+    }
+    setDeckIds(shuffled);
     setCardIdx(0);
     setPinnedPersonId(null);
     setKeepPrayingMode(false);
@@ -631,6 +640,7 @@ export default function App() {
   const praySessionCount = prayedPeople.reduce((sum, p) => sum + (p.weekPrayCount || 1), 0); // total sessions this week
   const upcomingBdays = getUpcomingBirthdays(activePeople);
   const urgentBdays = upcomingBdays.filter(b => b.diff <= 3).length;
+  const todayBdayPrayed = upcomingBdays.filter(b => b.diff === 0 && withinWeek(b.person.prayedAt));
 
   function goToPerson(personId) {
     setView("pray");
@@ -880,7 +890,7 @@ export default function App() {
         <div style={{ ...S.weekBar, cursor: "pointer" }} onClick={() => setView("week")}>
           <Heart size={13} color="#d4916a" fill="#d4916a" />
           <span style={S.weekText}>{prayedCount >= activePeople.length ? praySessionCount : prayedCount} / {activePeople.length} this week</span>
-          {urgentBdays > 0 && <span style={S.bdayAlert}><span style={{lineHeight:1}}>🎂</span><span style={{lineHeight:1}}>{urgentBdays}</span></span>}
+          {urgentBdays > 0 && <span style={{ ...S.bdayAlert, ...(upcomingBdays.some(b => b.diff === 0) ? { animation:"bdayGlow 1.6s ease-in-out infinite" } : {}) }}><span style={{lineHeight:1}}>🎂</span><span style={{lineHeight:1}}>{urgentBdays}</span></span>}
         </div>
       </header>
 
@@ -949,7 +959,14 @@ export default function App() {
                 <p style={S.emptySub}>Add people in the People tab or import a CSV.</p>
               </div>
             ) : filter === "all" ? (
-              <AllPrayedScreen prayedCount={prayedCount} praySessionCount={praySessionCount} total={activePeople.length} onWeek={() => setView("week")} onKeepPraying={startKeepPraying} />
+              <>
+                {todayBdayPrayed.map(({ person }) => (
+                  <button key={person.id} onClick={() => { setPinnedPersonId(person.id); setReqFor(null); setReady(true); }} style={S.bdayBanner}>
+                    🎂 Today is {person.name}’s birthday! Tap to pray for them.
+                  </button>
+                ))}
+                <AllPrayedScreen prayedCount={prayedCount} praySessionCount={praySessionCount} total={activePeople.length} onWeek={() => setView("week")} onKeepPraying={startKeepPraying} />
+              </>
             ) : (
               <div style={S.empty}>
                 <Heart size={36} fill={C.prayedGreen} color={C.prayedGreen} />
@@ -979,6 +996,11 @@ export default function App() {
                 </div>
               ) : (
                 <>
+                  {todayBdayPrayed.map(({ person }) => (
+                    <button key={person.id} onClick={() => { setPinnedPersonId(person.id); setReqFor(null); }} style={S.bdayBanner}>
+                      🎂 Today is {person.name}{'\u2019'}s birthday! Tap to pray for them.
+                    </button>
+                  ))}
                   <div style={S.swipeHint}>← swipe to navigate →</div>
 
                   <div style={S.cardOuter} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
@@ -1015,7 +1037,7 @@ export default function App() {
                       <h2 style={S.cardName}>{current?.name}</h2>
 
                       {bdayStatus && (
-                        <div style={{ ...S.bdayChip, ...(bdayStatus.urgent ? S.bdayChipUrgent : {}) }}>{bdayStatus.label}</div>
+                        <div style={{ ...S.bdayChip, ...(bdayStatus.urgent ? S.bdayChipUrgent : {}), ...(bdayStatus.today ? { animation: "bdayGlow 1.6s ease-in-out infinite", fontSize: 13, padding: "6px 14px" } : {}) }}>{bdayStatus.today ? <span style={{ display:"inline-block", animation:"bdaySpin 2s ease-in-out infinite", marginRight:6 }}>🎂</span> : null}{bdayStatus.label.replace("🎂 ", "")}</div>
                       )}
                       {current?.birthday && !bdayStatus && (
                         <div style={S.bdayQuiet}><Cake size={11} style={{ marginRight: 5, opacity: 0.5 }} />{formatBirthday(current.birthday)}</div>
@@ -1453,6 +1475,7 @@ const S = {
   toggleOptOn: { background: C.surface, color: C.cream, fontWeight: 500 },
   filterSelect: { background: C.faint, border: `1px solid ${C.border}`, color: C.muted, borderRadius: 20, padding: "5px 12px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", outline: "none", flex: 1 },
   reshuffleBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 20, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 },
+  bdayBanner: { background: "#2a1e08", border: `1px solid ${C.gold}`, borderRadius: 12, color: C.goldLight, padding: "12px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", textAlign: "center", width: "100%", marginBottom: 8, animation: "bdayGlow 1.6s ease-in-out infinite" },
   swipeHint: { fontSize: 11, color: "#3a3020", textAlign: "center", marginBottom: 8, letterSpacing: "0.05em" },
   empty: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, paddingBottom: 60 },
   emptyTitle: { fontFamily: "'Cormorant Garamond', serif", fontSize: 22, color: C.muted, margin: 0 },
