@@ -499,9 +499,12 @@ export default function App() {
 
         if (lastSnapshotWeek !== currentWeekStart) {
           const prevWeekStart = currentWeekStart - 7 * 24 * 60 * 60 * 1000;
-          // Count unique people prayed for last week (prayedAt falls in the previous week window)
-          const prevWeekPrayed = data.filter(p => p.prayedAt && p.prayedAt >= prevWeekStart && p.prayedAt < currentWeekStart);
-          const prevWeekCount = prevWeekPrayed.length;
+          // Count people whose prayedWeek matches the previous week start (reliable regardless of timing)
+          // Fall back to prayedAt window for people prayed before prayedWeek was introduced
+          const prevWeekCount = data.filter(p =>
+            p.prayedWeek === prevWeekStart ||
+            (!p.prayedWeek && p.prayedAt && p.prayedAt >= prevWeekStart && p.prayedAt < currentWeekStart)
+          ).length;
           const total = data.filter(p => p.active !== false).length;
           const newEntry = { weekStart: currentWeekStart, prevWeekStart, count: prevWeekCount, total };
           const updated = [newEntry, ...history].slice(0, 3);
@@ -749,7 +752,9 @@ export default function App() {
       if (p.id !== current.id) return p;
       const weekStart = getWeekStartET();
       const inSameWeek = p.prayedAt && p.prayedAt >= weekStart;
-      return { ...p, prayedAt: Date.now(), prayCount: (p.prayCount || 0) + 1, weekPrayCount: inSameWeek ? (p.weekPrayCount || 1) + 1 : 1, updatedAt: Date.now() };
+      const weekStart = getWeekStartET();
+      const isNew = !inSameWeek;
+      return { ...p, prayedAt: Date.now(), prayedWeek: weekStart, prayCount: (p.prayCount || 0) + 1, weekPrayCount: inSameWeek ? (p.weekPrayCount || 1) + 1 : 1, updatedAt: Date.now() };
     }));
     setPinnedPersonId(null);
     setKeepPrayingMode(false); // return to celebration screen after Pray Again
