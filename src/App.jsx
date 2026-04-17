@@ -14,6 +14,17 @@ function shouldShowTap() {
   } catch { return true; }
 }
 
+function getBdayDismissKey(personId) {
+  const today = new Date().toLocaleDateString("en-US", { timeZone: "America/New_York" });
+  return `intercede-bday-dismissed-${personId}-${today}`;
+}
+function isBdayDismissed(personId) {
+  try { return !!localStorage.getItem(getBdayDismissKey(personId)); } catch { return false; }
+}
+function dismissBday(personId) {
+  try { localStorage.setItem(getBdayDismissKey(personId), "1"); } catch {}
+}
+
 function recordTapShown() {
   try { localStorage.setItem(TAP_KEY, String(Date.now())); } catch {}
 }
@@ -643,7 +654,7 @@ export default function App() {
   const praySessionCount = prayedPeople.reduce((sum, p) => sum + (p.weekPrayCount || 1), 0); // total sessions this week
   const upcomingBdays = getUpcomingBirthdays(activePeople);
   const urgentBdays = upcomingBdays.filter(b => b.diff <= 3).length;
-  const todayBdayPrayed = upcomingBdays.filter(b => b.diff === 0 && withinWeek(b.person.prayedAt));
+  const todayBdayPrayed = upcomingBdays.filter(b => b.diff === 0 && withinWeek(b.person.prayedAt) && !isBdayDismissed(b.person.id));
 
   function goToPerson(personId) {
     setView("pray");
@@ -752,10 +763,9 @@ export default function App() {
       if (p.id !== current.id) return p;
       const weekStart = getWeekStartET();
       const inSameWeek = p.prayedAt && p.prayedAt >= weekStart;
-      const weekStart = getWeekStartET();
-      const isNew = !inSameWeek;
       return { ...p, prayedAt: Date.now(), prayedWeek: weekStart, prayCount: (p.prayCount || 0) + 1, weekPrayCount: inSameWeek ? (p.weekPrayCount || 1) + 1 : 1, updatedAt: Date.now() };
     }));
+    if (current?.id) dismissBday(current.id);
     setPinnedPersonId(null);
     setKeepPrayingMode(false); // return to celebration screen after Pray Again
   }
@@ -966,9 +976,12 @@ export default function App() {
             ) : filter === "all" ? (
               <>
                 {todayBdayPrayed.map(({ person }) => (
-                  <button key={person.id} onClick={() => { setPinnedPersonId(person.id); setReqFor(null); setReady(true); }} style={S.bdayBanner}>
-                    🎂 Today is {person.name}’s birthday! Tap to pray.
-                  </button>
+                  <div key={person.id} style={{ position:"relative", width:"100%", marginBottom:8 }}>
+                    <button onClick={() => { dismissBday(person.id); setPinnedPersonId(person.id); setReqFor(null); setReady(true); setPeople(p => [...p]); }} style={S.bdayBanner}>
+                      {"🎂"} Today is {person.name}{"’"}s birthday! Tap to pray.
+                    </button>
+                    <button onClick={e => { e.stopPropagation(); dismissBday(person.id); setPeople(p => [...p]); }} style={S.bdayDismiss}>{"✕"}</button>
+                  </div>
                 ))}
                 <AllPrayedScreen prayedCount={prayedCount} praySessionCount={praySessionCount} total={activePeople.length} onWeek={() => setView("week")} onKeepPraying={startKeepPraying} />
               </>
@@ -1002,9 +1015,12 @@ export default function App() {
               ) : (
                 <>
                   {todayBdayPrayed.map(({ person }) => (
-                    <button key={person.id} onClick={() => { setPinnedPersonId(person.id); setReqFor(null); }} style={S.bdayBanner}>
-                      🎂 Today is {person.name}{'\u2019'}s birthday! Tap to pray.
-                    </button>
+                    <div key={person.id} style={{ position:"relative", width:"100%", marginBottom:8 }}>
+                      <button onClick={() => { dismissBday(person.id); setPinnedPersonId(person.id); setReqFor(null); setPeople(p => [...p]); }} style={S.bdayBanner}>
+                        {"🎂"} Today is {person.name}{"’"}s birthday! Tap to pray.
+                      </button>
+                      <button onClick={e => { e.stopPropagation(); dismissBday(person.id); setPeople(p => [...p]); }} style={S.bdayDismiss}>{"✕"}</button>
+                    </div>
                   ))}
                   <div style={S.swipeHint}>← swipe to navigate →</div>
 
@@ -1480,6 +1496,7 @@ const S = {
   toggleOptOn: { background: C.surface, color: C.cream, fontWeight: 500 },
   filterSelect: { background: C.faint, border: `1px solid ${C.border}`, color: C.muted, borderRadius: 20, padding: "5px 12px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", outline: "none", flex: 1 },
   reshuffleBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 20, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 },
+  bdayDismiss: { position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#5a3e10", cursor:"pointer", fontSize:14, padding:"4px 6px", lineHeight:1 },
   bdayBanner: { background: "#2a1e08", border: `1px solid ${C.gold}`, borderRadius: 12, color: C.goldLight, padding: "12px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", textAlign: "center", width: "100%", marginBottom: 8, animation: "bdayGlow 1.6s ease-in-out infinite" },
   swipeHint: { fontSize: 11, color: "#3a3020", textAlign: "center", marginBottom: 8, letterSpacing: "0.05em" },
   empty: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, paddingBottom: 60 },
