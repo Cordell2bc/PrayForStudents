@@ -967,7 +967,7 @@ export default function App() {
               <>
                 {todayBdayPrayed.map(({ person }) => (
                   <button key={person.id} onClick={() => { setPinnedPersonId(person.id); setReqFor(null); setReady(true); }} style={S.bdayBanner}>
-                    🎂 Today is {person.name}’s birthday! Tap to pray for them.
+                    🎂 Today is {person.name}’s birthday! Tap to pray.
                   </button>
                 ))}
                 <AllPrayedScreen prayedCount={prayedCount} praySessionCount={praySessionCount} total={activePeople.length} onWeek={() => setView("week")} onKeepPraying={startKeepPraying} />
@@ -1003,7 +1003,7 @@ export default function App() {
                 <>
                   {todayBdayPrayed.map(({ person }) => (
                     <button key={person.id} onClick={() => { setPinnedPersonId(person.id); setReqFor(null); }} style={S.bdayBanner}>
-                      🎂 Today is {person.name}{'\u2019'}s birthday! Tap to pray for them.
+                      🎂 Today is {person.name}{'\u2019'}s birthday! Tap to pray.
                     </button>
                   ))}
                   <div style={S.swipeHint}>← swipe to navigate →</div>
