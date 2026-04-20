@@ -506,16 +506,25 @@ export default function App() {
         if (data.length > 0) setPeople(data);
 
         const currentWeekStart = getWeekStartET();
-        const lastSnapshotWeek = history.length > 0 ? history[0].weekStart : null;
+        // Compare by date string to avoid millisecond/DST drift between calls
+        const currentWeekDate = new Date(currentWeekStart).toLocaleDateString("en-US", { timeZone: "America/New_York" });
+        const lastSnapshotDate = history.length > 0
+          ? new Date(history[0].weekStart).toLocaleDateString("en-US", { timeZone: "America/New_York" })
+          : null;
 
-        if (lastSnapshotWeek !== currentWeekStart) {
+        if (lastSnapshotDate !== currentWeekDate) {
           const prevWeekStart = currentWeekStart - 7 * 24 * 60 * 60 * 1000;
-          // Count people whose prayedWeek matches the previous week start (reliable regardless of timing)
-          // Fall back to prayedAt window for people prayed before prayedWeek was introduced
-          const prevWeekCount = data.filter(p =>
+          // Count prayer sessions for last week
+          // Primary: prayedWeek field (set since feature was added)
+          // Fallback: prayedAt timestamp window (for older records)
+          const prevWeekPrayed = data.filter(p =>
             p.prayedWeek === prevWeekStart ||
             (!p.prayedWeek && p.prayedAt && p.prayedAt >= prevWeekStart && p.prayedAt < currentWeekStart)
-          ).length;
+          );
+          // Sum sessions: use weekPrayCount if prayedWeek matches (accurate), else 1 per person
+          const prevWeekCount = prevWeekPrayed.reduce((sum, p) =>
+            sum + (p.prayedWeek === prevWeekStart && p.weekPrayCount ? p.weekPrayCount : 1), 0
+          );
           const total = data.filter(p => p.active !== false).length;
           const newEntry = { weekStart: currentWeekStart, prevWeekStart, count: prevWeekCount, total };
           const updated = [newEntry, ...history].slice(0, 3);
@@ -1366,7 +1375,14 @@ export default function App() {
         <div style={S.importWrap}>
           {/* Weekly prayer report */}
           <div style={S.reportBox}>
-            <p style={S.reportTitle}>📊 Weekly Prayer Report</p>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+              <p style={{ ...S.reportTitle, margin:0 }}>📊 Weekly Prayer Report</p>
+              {weekHistory.length > 0 && (
+                <button onClick={async () => { setWeekHistory([]); await apiSaveHistory([]); }} style={{ background:"none", border:"none", color:"#3d3226", fontSize:11, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+                  clear
+                </button>
+              )}
+            </div>
             {weekHistory.length === 0 ? (
               <p style={S.reportEmpty}>Data will appear here after the first Monday reset.</p>
             ) : weekHistory.map((w, i) => {
