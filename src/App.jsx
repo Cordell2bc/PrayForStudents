@@ -22,11 +22,11 @@ function isBdayDismissed(personId) {
   try { return !!localStorage.getItem(getBdayDismissKey(personId)); } catch { return false; }
 }
 function dismissBday(personId) {
-  try { localStorage.setItem(getBdayDismissKey(personId), "1"); } catch {}
+  try { localStorage.setItem(getBdayDismissKey(personId), "1"); } catch (_e) {}
 }
 
 function recordTapShown() {
-  try { localStorage.setItem(TAP_KEY, String(Date.now())); } catch {}
+  try { localStorage.setItem(TAP_KEY, String(Date.now())); } catch (_e) {}
 }
 const ADMIN_KEY = "intercede-admin-authed";
 const ADMIN_TTL = 86400000;
@@ -559,7 +559,7 @@ export default function App() {
           try {
             const data = await apiLoad();
             if (data.length > 0) setPeople(data);
-          } catch {}
+          } catch (_e) {}
           setLoaded(true);
         }, 3000);
       }
@@ -605,7 +605,8 @@ export default function App() {
           if (JSON.stringify(prev) === freshStr) return prev;
           fromPoll.current = true;
           return fresh;
-      } catch {}
+        });
+      } catch (_e) {}
     };
     pollTimer.current = setInterval(poll, 15000);
     return () => clearInterval(pollTimer.current);
