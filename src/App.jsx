@@ -101,6 +101,29 @@ function getWeekStartET() {
   return monET.getTime() + utcOffset;
 }
 
+
+function getWeekDateStringET() {
+  const now = new Date();
+  const etStr = now.toLocaleString("en-US", { timeZone: "America/New_York" });
+  const etNow = new Date(etStr);
+  const day = etNow.getDay();
+  const daysFromMon = day === 0 ? 6 : day - 1;
+  const monET = new Date(etNow);
+  monET.setDate(etNow.getDate() - daysFromMon);
+  return `${monET.getMonth()+1}/${monET.getDate()}/${monET.getFullYear()}`;
+}
+
+function getPrevWeekDateStringET() {
+  const now = new Date();
+  const etStr = now.toLocaleString("en-US", { timeZone: "America/New_York" });
+  const etNow = new Date(etStr);
+  const day = etNow.getDay();
+  const daysFromMon = day === 0 ? 6 : day - 1;
+  const monET = new Date(etNow);
+  monET.setDate(etNow.getDate() - daysFromMon - 7);
+  return `${monET.getMonth()+1}/${monET.getDate()}/${monET.getFullYear()}`;
+}
+
 function withinWeek(ts) {
   return ts && ts >= getWeekStartET();
 }
@@ -502,11 +525,9 @@ export default function App() {
     (async () => {
       try {
         const [data, history] = await Promise.all([apiLoad(), apiLoadHistory()]);
-        // Only set people if we actually got data back
         if (data.length > 0) setPeople(data);
 
         const currentWeekStart = getWeekStartET();
-        // Compare by date string to avoid millisecond/DST drift between calls
         const currentWeekDate = new Date(currentWeekStart).toLocaleDateString("en-US", { timeZone: "America/New_York" });
         const lastSnapshotDate = history.length > 0
           ? new Date(history[0].weekStart).toLocaleDateString("en-US", { timeZone: "America/New_York" })
@@ -514,19 +535,18 @@ export default function App() {
 
         if (lastSnapshotDate !== currentWeekDate) {
           const prevWeekStart = currentWeekStart - 7 * 24 * 60 * 60 * 1000;
-          // Count prayer sessions for last week
-          // Primary: prayedWeek field (set since feature was added)
-          // Fallback: prayedAt timestamp window (for older records)
+          const prevWeekDateStr = getPrevWeekDateStringET();
+          // Use date string comparison — immune to timestamp precision issues
           const prevWeekPrayed = data.filter(p =>
-            p.prayedWeek === prevWeekStart ||
-            (!p.prayedWeek && p.prayedAt && p.prayedAt >= prevWeekStart && p.prayedAt < currentWeekStart)
+            p.prayedWeekDate === prevWeekDateStr ||
+            // Fallback for records before prayedWeekDate was introduced
+            (!p.prayedWeekDate && p.prayedAt && p.prayedAt >= prevWeekStart && p.prayedAt < currentWeekStart)
           );
-          // Sum sessions: use weekPrayCount if prayedWeek matches (accurate), else 1 per person
           const prevWeekCount = prevWeekPrayed.reduce((sum, p) =>
-            sum + (p.prayedWeek === prevWeekStart && p.weekPrayCount ? p.weekPrayCount : 1), 0
+            sum + (p.prayedWeekDate === prevWeekDateStr && p.weekPrayCount ? p.weekPrayCount : 1), 0
           );
           const total = data.filter(p => p.active !== false).length;
-          const newEntry = { weekStart: currentWeekStart, prevWeekStart, count: prevWeekCount, total };
+          const newEntry = { weekStart: currentWeekStart, prevWeekStart, prevWeekDateStr, count: prevWeekCount, total };
           const updated = [newEntry, ...history].slice(0, 3);
           setWeekHistory(updated);
           await apiSaveHistory(updated);
@@ -535,8 +555,6 @@ export default function App() {
         }
         setLoaded(true);
       } catch {
-        // Load failed — still mark loaded so UI shows, but DO NOT allow saves
-        // until we have confirmed real data. We retry once after 3s.
         setTimeout(async () => {
           try {
             const data = await apiLoad();
@@ -587,7 +605,6 @@ export default function App() {
           if (JSON.stringify(prev) === freshStr) return prev;
           fromPoll.current = true;
           return fresh;
-        });
       } catch {}
     };
     pollTimer.current = setInterval(poll, 15000);
@@ -772,7 +789,8 @@ export default function App() {
       if (p.id !== current.id) return p;
       const weekStart = getWeekStartET();
       const inSameWeek = p.prayedAt && p.prayedAt >= weekStart;
-      return { ...p, prayedAt: Date.now(), prayedWeek: weekStart, prayCount: (p.prayCount || 0) + 1, weekPrayCount: inSameWeek ? (p.weekPrayCount || 1) + 1 : 1, updatedAt: Date.now() };
+      const weekDateStr = getWeekDateStringET();
+      return { ...p, prayedAt: Date.now(), prayedWeek: weekStart, prayedWeekDate: weekDateStr, prayCount: (p.prayCount || 0) + 1, weekPrayCount: inSameWeek ? (p.weekPrayCount || 1) + 1 : 1, updatedAt: Date.now() };
     }));
     if (current?.id) dismissBday(current.id);
     setPinnedPersonId(null);
