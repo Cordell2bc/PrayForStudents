@@ -902,6 +902,33 @@ export default function App() {
     }
   }
 
+  async function recalculateHistory() {
+    const currentWeekStart = getWeekStartET();
+    const currentWeekDateStr = getWeekDateStringET();
+    const newHistory = [];
+    for (let i = 1; i <= 3; i++) {
+      const wStart = currentWeekStart - i * 7 * 24 * 60 * 60 * 1000;
+      const wEnd   = currentWeekStart - (i - 1) * 7 * 24 * 60 * 60 * 1000;
+      // Build date string for this week's Monday
+      const wDate = new Date(wStart);
+      const etStr = wDate.toLocaleString("en-US", { timeZone: "America/New_York" });
+      const etD = new Date(etStr);
+      const wDateStr = `${etD.getMonth()+1}/${etD.getDate()}/${etD.getFullYear()}`;
+      const prayed = people.filter(p =>
+        p.prayedWeekDate === wDateStr ||
+        (!p.prayedWeekDate && p.prayedAt && p.prayedAt >= wStart && p.prayedAt < wEnd)
+      );
+      const count = prayed.reduce((sum, p) =>
+        sum + (p.prayedWeekDate === wDateStr && p.weekPrayCount ? p.weekPrayCount : 1), 0
+      );
+      if (count > 0) {
+        newHistory.push({ weekStart: wEnd, prevWeekStart: wStart, prevWeekDateStr: wDateStr, count, total: activePeople.length });
+      }
+    }
+    setWeekHistory(newHistory);
+    await apiSaveHistory(newHistory);
+  }
+
   function submitAdminPw() {
     if (adminPwInput === ADMIN_PASSWORD) {
       setAdminAuthed(true);
@@ -1396,11 +1423,16 @@ export default function App() {
           <div style={S.reportBox}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
               <p style={{ ...S.reportTitle, margin:0 }}>📊 Weekly Prayer Report</p>
-              {weekHistory.length > 0 && (
-                <button onClick={async () => { setWeekHistory([]); await apiSaveHistory([]); }} style={{ background:"none", border:"none", color:"#3d3226", fontSize:11, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
-                  clear
+              <div style={{ display:"flex", gap:12 }}>
+                <button onClick={recalculateHistory} style={{ background:"none", border:"none", color:C.muted, fontSize:11, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+                  recalculate
                 </button>
-              )}
+                {weekHistory.length > 0 && (
+                  <button onClick={async () => { setWeekHistory([]); await apiSaveHistory([]); }} style={{ background:"none", border:"none", color:"#3d3226", fontSize:11, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+                    clear
+                  </button>
+                )}
+              </div>
             </div>
             {weekHistory.length === 0 ? (
               <p style={S.reportEmpty}>Data will appear here after the first Monday reset.</p>
