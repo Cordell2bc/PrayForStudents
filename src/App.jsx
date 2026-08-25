@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Heart, Plus, Trash2, Upload, X, RefreshCw, B
 
 const STORAGE_KEY = "intercede-people-v2";
 const ADMIN_PASSWORD = "Promo1398!";
-const VAPID_PUBLIC_KEY = "REPLACE_WITH_YOUR_VAPID_PUBLIC_KEY";
+const VAPID_PUBLIC_KEY = "BI4OYduhY_kBu_GJZtEsQAURClmTLOKMFM23GDuZ5EKd6z7dP5NcuCa0bZVv9eShUr9-gCFrhT1WenkRZAa4vJw";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - base64String.length % 4) % 4);
