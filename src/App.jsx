@@ -3,8 +3,7 @@ import { ChevronLeft, ChevronRight, Heart, Plus, Trash2, Upload, X, RefreshCw, B
 
 const STORAGE_KEY = "intercede-people-v2";
 const ADMIN_PASSWORD = "Promo1398!";
-const VAPID_PUBLIC_KEY = "BHP5ny1TYtb5Lm8bMgEPBTuh7CssoGXWfV-xxirGzFVNbSi_Bl0HvjM1RAqEzcfw2sMg_p-Y3ZWoluvDvibJGzE
-";
+const VAPID_PUBLIC_KEY = "REPLACE_WITH_YOUR_VAPID_PUBLIC_KEY";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - base64String.length % 4) % 4);
@@ -507,6 +506,7 @@ export default function App() {
   const [pushTime, setPushTime] = useState(() => localStorage.getItem("intercede-push-time") || "09:00");
   const [showIosGuide, setShowIosGuide] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
+  const [pushError, setPushError] = useState("");
   const [weekHistory, setWeekHistory] = useState([]);
   const [bdayInput, setBdayInput] = useState("");
 
@@ -533,18 +533,26 @@ export default function App() {
     // Check if push notifications are supported
     const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
     const isStandalone = window.navigator.standalone === true;
-    const hasServiceWorker = "serviceWorker" in navigator && "PushManager" in window;
-    if (hasServiceWorker) {
+    const hasSW = "serviceWorker" in navigator;
+    const hasPush = "PushManager" in window;
+
+    if (hasSW && hasPush) {
+      // Full push support (Android, or iOS 16.4+ on home screen)
       setPushSupported(true);
-      // Check if already subscribed
       navigator.serviceWorker.ready.then(reg => {
         reg.pushManager.getSubscription().then(sub => {
           if (sub) setPushEnabled(true);
         });
       }).catch(() => {});
     } else if (isIos && !isStandalone) {
-      // iOS Safari not on home screen — show guide option
+      // iOS in browser — needs to add to home screen first
       setPushSupported("ios-prompt");
+    } else if (isIos && isStandalone && !hasPush) {
+      // iOS on home screen but iOS < 16.4 — push not supported
+      setPushSupported("ios-unsupported");
+    } else if (hasSW && !hasPush) {
+      // SW available but no PushManager — unsupported browser
+      setPushSupported(false);
     }
     // Register service worker and mark device as seen today
     if ("serviceWorker" in navigator) {
@@ -993,10 +1001,20 @@ export default function App() {
 
   async function enablePush() {
     setPushLoading(true);
+    setPushError("");
     try {
       const reg = await navigator.serviceWorker.ready;
       const permission = await Notification.requestPermission();
-      if (permission !== "granted") { setPushLoading(false); return; }
+      if (permission === "denied") {
+        setPushError("Notifications blocked. Go to Settings → Safari → [this site] → Allow Notifications.");
+        setPushLoading(false);
+        return;
+      }
+      if (permission !== "granted") {
+        setPushError("Permission not granted. Please try again.");
+        setPushLoading(false);
+        return;
+      }
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
@@ -1006,7 +1024,9 @@ export default function App() {
       localStorage.setItem("intercede-push-time", pushTime);
       localStorage.setItem("intercede-push-hash", hash);
       setPushEnabled(true);
-    } catch (_e) {}
+    } catch (e) {
+      setPushError("Error: " + (e.message || "Could not enable notifications."));
+    }
     setPushLoading(false);
   }
 
@@ -1646,6 +1666,12 @@ export default function App() {
         )}
 
         {/* Push supported (Android or iOS on home screen) */}
+        {pushSupported === "ios-unsupported" && (
+          <p style={{ fontSize:12, color:C.muted, margin:0, lineHeight:1.6 }}>
+            Daily reminders require iOS 16.4 or later. Please update your iPhone to use this feature.
+          </p>
+        )}
+
         {pushSupported === true && (
           <div style={S.reminderControls}>
             {pushEnabled ? (
@@ -1667,6 +1693,7 @@ export default function App() {
                 <button onClick={enablePush} disabled={pushLoading} style={S.reminderOnBtn}>
                   {pushLoading ? "Setting up…" : "Enable reminders"}
                 </button>
+                {pushError && <p style={{ fontSize:12, color:"#c07070", margin:0, lineHeight:1.5 }}>{pushError}</p>}
               </>
             )}
           </div>
