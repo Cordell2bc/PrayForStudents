@@ -3,6 +3,14 @@ import { ChevronLeft, ChevronRight, Heart, Plus, Trash2, Upload, X, RefreshCw, B
 
 const STORAGE_KEY = "intercede-people-v2";
 const ADMIN_PASSWORD = "Promo1398!";
+const VAPID_PUBLIC_KEY = "REPLACE_WITH_YOUR_VAPID_PUBLIC_KEY";
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
 const TAP_KEY = "intercede-tap-ts";
 const TAP_TTL = 24 * 60 * 60 * 1000;
 
@@ -59,6 +67,22 @@ async function apiSave(people) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(people),
+  });
+}
+
+async function apiRegisterPush(subscription, reminderTime) {
+  await fetch("/api/push-register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ subscription, reminderTime }),
+  });
+}
+
+async function apiMarkSeen(endpointHash) {
+  await fetch("/api/push-check", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ endpointHash }),
   });
 }
 
@@ -477,6 +501,11 @@ export default function App() {
   const [editNameFor, setEditNameFor] = useState(null);
   const [nameInput, setNameInput] = useState("");
   const [confirmPromo, setConfirmPromo] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushTime, setPushTime] = useState(() => localStorage.getItem("intercede-push-time") || "09:00");
+  const [showIosGuide, setShowIosGuide] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
   const [weekHistory, setWeekHistory] = useState([]);
   const [bdayInput, setBdayInput] = useState("");
 
@@ -498,6 +527,38 @@ export default function App() {
   const [adminPwInput, setAdminPwInput] = useState("");
   const [adminPwError, setAdminPwError] = useState("");
   const [pendingView, setPendingView] = useState(null);
+
+  useEffect(() => {
+    // Check if push notifications are supported
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isStandalone = window.navigator.standalone === true;
+    const hasServiceWorker = "serviceWorker" in navigator && "PushManager" in window;
+    if (hasServiceWorker) {
+      setPushSupported(true);
+      // Check if already subscribed
+      navigator.serviceWorker.ready.then(reg => {
+        reg.pushManager.getSubscription().then(sub => {
+          if (sub) setPushEnabled(true);
+        });
+      }).catch(() => {});
+    } else if (isIos && !isStandalone) {
+      // iOS Safari not on home screen — show guide option
+      setPushSupported("ios-prompt");
+    }
+    // Register service worker and mark device as seen today
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").then(reg => {
+        reg.pushManager.getSubscription().then(sub => {
+          if (sub) {
+            const hash = btoa(sub.endpoint).slice(0, 40);
+            apiMarkSeen(hash).catch(() => {});
+          }
+        });
+      }).catch(() => {});
+    } else {
+      apiMarkSeen(null).catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -927,6 +988,46 @@ export default function App() {
     }
     setWeekHistory(newHistory);
     await apiSaveHistory(newHistory);
+  }
+
+  async function enablePush() {
+    setPushLoading(true);
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") { setPushLoading(false); return; }
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+      const hash = btoa(sub.endpoint).slice(0, 40);
+      await apiRegisterPush(sub.toJSON(), pushTime);
+      localStorage.setItem("intercede-push-time", pushTime);
+      localStorage.setItem("intercede-push-hash", hash);
+      setPushEnabled(true);
+    } catch (_e) {}
+    setPushLoading(false);
+  }
+
+  async function updatePushTime(time) {
+    setPushTime(time);
+    localStorage.setItem("intercede-push-time", time);
+    if (pushEnabled) {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) await apiRegisterPush(sub.toJSON(), time);
+      } catch (_e) {}
+    }
+  }
+
+  async function disablePush() {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) await sub.unsubscribe();
+      setPushEnabled(false);
+    } catch (_e) {}
   }
 
   function submitAdminPw() {
@@ -1521,6 +1622,56 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* Reminders section */}
+      <div style={S.reminderSection}>
+        <p style={S.reminderTitle}>🔔 Daily Reminders</p>
+
+        {/* iOS not on home screen */}
+        {pushSupported === "ios-prompt" && !showIosGuide && (
+          <button onClick={() => setShowIosGuide(true)} style={S.reminderSetupBtn}>
+            Set up reminders on iPhone
+          </button>
+        )}
+
+        {showIosGuide && (
+          <div style={S.iosGuide}>
+            <p style={S.iosGuideTitle}>Add to your Home Screen first:</p>
+            <div style={S.iosStep}><span style={S.iosStepNum}>1</span><span>Open this page in <strong style={{color:C.cream}}>Safari</strong> (not Chrome)</span></div>
+            <div style={S.iosStep}><span style={S.iosStepNum}>2</span><span>Tap the <strong style={{color:C.cream}}>Share</strong> button <span style={{fontSize:16}}>⎋</span> at the bottom</span></div>
+            <div style={S.iosStep}><span style={S.iosStepNum}>3</span><span>Tap <strong style={{color:C.cream}}>Add to Home Screen</strong></span></div>
+            <div style={S.iosStep}><span style={S.iosStepNum}>4</span><span>Open the app from your Home Screen and come back here</span></div>
+            <button onClick={() => setShowIosGuide(false)} style={S.iosDismiss}>Got it</button>
+          </div>
+        )}
+
+        {/* Push supported (Android or iOS on home screen) */}
+        {pushSupported === true && (
+          <div style={S.reminderControls}>
+            {pushEnabled ? (
+              <>
+                <div style={S.reminderRow}>
+                  <span style={S.reminderLabel}>Reminder time</span>
+                  <input type="time" value={pushTime} onChange={e => updatePushTime(e.target.value)}
+                    style={S.timeInput} />
+                </div>
+                <button onClick={disablePush} style={S.reminderOffBtn}>Turn off reminders</button>
+              </>
+            ) : (
+              <>
+                <div style={S.reminderRow}>
+                  <span style={S.reminderLabel}>Remind me daily at</span>
+                  <input type="time" value={pushTime} onChange={e => setPushTime(e.target.value)}
+                    style={S.timeInput} />
+                </div>
+                <button onClick={enablePush} disabled={pushLoading} style={S.reminderOnBtn}>
+                  {pushLoading ? "Setting up…" : "Enable reminders"}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Admin footer link */}
       <div style={S.adminFooter}>
         {adminAuthed
@@ -1694,6 +1845,21 @@ const S = {
   reportBar: { height: 6, background: C.faint, borderRadius: 3, overflow: "hidden" },
   reportBarFill: { height: "100%", background: `linear-gradient(90deg, ${C.gold}, ${C.goldLight})`, borderRadius: 3, transition: "width 0.6s ease" },
   reportPct: { fontSize: 11, color: C.muted },
+  // REMINDERS
+  reminderSection: { margin: "16px 20px 0", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 },
+  reminderTitle: { fontSize: 12, color: C.muted, fontWeight: 500, margin: 0, textTransform: "uppercase", letterSpacing: "0.06em" },
+  reminderSetupBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 10, padding: "10px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", textAlign: "left" },
+  iosGuide: { background: "#161109", borderRadius: 10, padding: "14px", display: "flex", flexDirection: "column", gap: 10 },
+  iosGuideTitle: { fontSize: 12, color: C.cream, margin: 0, fontWeight: 500 },
+  iosStep: { display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: C.muted, lineHeight: 1.5 },
+  iosStepNum: { background: C.gold, color: "#0e0c09", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0, marginTop: 1 },
+  iosDismiss: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: "7px 14px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", alignSelf: "flex-start", marginTop: 4 },
+  reminderControls: { display: "flex", flexDirection: "column", gap: 10 },
+  reminderRow: { display: "flex", alignItems: "center", justifyContent: "space-between" },
+  reminderLabel: { fontSize: 13, color: C.muted },
+  timeInput: { background: "#0e0c09", border: `1px solid ${C.border}`, borderRadius: 8, color: C.cream, padding: "6px 10px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", cursor: "pointer" },
+  reminderOnBtn: { background: `linear-gradient(135deg, ${C.gold}, #b8821e)`, border: "none", color: "#0e0c09", borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  reminderOffBtn: { background: "none", border: `1px solid ${C.border}`, color: "#8a5050", borderRadius: 10, padding: "9px 0", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
   // ADMIN FOOTER
   adminFooter: { display: "flex", justifyContent: "center", padding: "12px 0 20px", marginTop: "auto" },
   adminLink: { background: "none", border: "none", color: "#2e2518", fontSize: 11, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.06em" },
