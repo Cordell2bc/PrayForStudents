@@ -17,17 +17,23 @@ export async function onRequest(context) {
     return new Response(JSON.stringify({ error: "KV not bound" }), { status: 500, headers });
   }
 
-  const { subscription, reminderTime } = await request.json();
-  if (!subscription?.endpoint) {
-    return new Response(JSON.stringify({ error: "Invalid subscription" }), { status: 400, headers });
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return new Response(JSON.stringify({ error: "Invalid JSON", detail: e.message }), { status: 400, headers });
   }
 
-  // Use endpoint as the unique key for this device
+  const { subscription, reminderTime } = body;
+
+  if (!subscription?.endpoint) {
+    return new Response(JSON.stringify({ error: "Invalid subscription", received: JSON.stringify(body).slice(0, 200) }), { status: 400, headers });
+  }
+
   const key = "push:" + btoa(subscription.endpoint).slice(0, 40);
   const record = { subscription, reminderTime: reminderTime || "09:00", lastSeen: null };
   await env.INTERCEDE_KV.put(key, JSON.stringify(record));
 
-  // Store the key in the index so the cron worker can find all subscriptions
   const indexRaw = await env.INTERCEDE_KV.get("push:index");
   const index = indexRaw ? JSON.parse(indexRaw) : [];
   if (!index.includes(key)) {
@@ -35,5 +41,5 @@ export async function onRequest(context) {
     await env.INTERCEDE_KV.put("push:index", JSON.stringify(index));
   }
 
-  return new Response(JSON.stringify({ ok: true }), { headers });
+  return new Response(JSON.stringify({ ok: true, key, reminderTime }), { headers });
 }
