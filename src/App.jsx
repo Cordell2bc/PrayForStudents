@@ -507,6 +507,7 @@ export default function App() {
   const [showIosGuide, setShowIosGuide] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [pushError, setPushError] = useState("");
+  const [reminderExpanded, setReminderExpanded] = useState(!pushEnabled);
   const [weekHistory, setWeekHistory] = useState([]);
   const [bdayInput, setBdayInput] = useState("");
 
@@ -1026,6 +1027,7 @@ export default function App() {
       localStorage.setItem("intercede-push-time", pushTime);
       localStorage.setItem("intercede-push-hash", hash);
       setPushEnabled(true);
+      setReminderExpanded(false);
     } catch (e) {
       setPushError("Error: " + (e.message || "Could not enable notifications."));
     }
@@ -1658,59 +1660,69 @@ export default function App() {
       )}
       {/* Reminders section */}
       <div style={S.reminderSection}>
-        <div style={{ display:"flex", alignItems:"center", gap:8 }}><Bell size={14} color={C.muted} /><p style={S.reminderTitle}>Daily Reminders</p></div>
-
-        {/* iOS not on home screen */}
-        {pushSupported === "ios-prompt" && !showIosGuide && (
-          <button onClick={() => setShowIosGuide(true)} style={S.reminderSetupBtn}>
-            Set up reminders on iPhone
-          </button>
-        )}
-
-        {showIosGuide && (
-          <div style={S.iosGuide}>
-            <p style={S.iosGuideTitle}>Add to your Home Screen first:</p>
-            <div style={S.iosStep}><span style={S.iosStepNum}>1</span><span>Open this page in <strong style={{color:C.cream}}>Safari</strong> (not Chrome)</span></div>
-            <div style={S.iosStep}><span style={S.iosStepNum}>2</span><span>Tap the <strong style={{color:C.cream}}>Share</strong> button <span style={{fontSize:16}}>⎋</span> at the bottom</span></div>
-            <div style={S.iosStep}><span style={S.iosStepNum}>3</span><span>Tap <strong style={{color:C.cream}}>Add to Home Screen</strong></span></div>
-            <div style={S.iosStep}><span style={S.iosStepNum}>4</span><span>Open the app from your Home Screen and come back here</span></div>
-            <button onClick={() => setShowIosGuide(false)} style={S.iosDismiss}>Got it</button>
+        {/* Header row — always visible, tappable to expand/collapse */}
+        <button onClick={() => setReminderExpanded(e => !e)} style={{ background:"none", border:"none", padding:0, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"space-between", width:"100%" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <Bell size={14} color={pushEnabled ? C.accent : C.muted} />
+            <p style={{ ...S.reminderTitle, color: pushEnabled ? C.accent : C.muted, margin:0 }}>
+              {pushEnabled ? `Reminders on · ${pushTime}` : "Daily Reminders"}
+            </p>
           </div>
-        )}
+          <span style={{ fontSize:10, color:C.muted, opacity:0.6 }}>{reminderExpanded ? "▲" : "▼"}</span>
+        </button>
 
-        {/* Push supported (Android or iOS on home screen) */}
-        {pushSupported === "ios-unsupported" && (
-          <p style={{ fontSize:12, color:C.muted, margin:0, lineHeight:1.6 }}>
-            Daily reminders require iOS 16.4 or later. Please update your iPhone to use this feature.
-          </p>
-        )}
+        {reminderExpanded && (<>
+          {/* iOS not on home screen */}
+          {pushSupported === "ios-prompt" && !showIosGuide && (
+            <button onClick={() => setShowIosGuide(true)} style={S.reminderSetupBtn}>
+              Set up reminders on iPhone
+            </button>
+          )}
 
-        {pushSupported === true && (
-          <div style={S.reminderControls}>
-            {pushEnabled ? (
-              <>
-                <div style={S.reminderRow}>
-                  <span style={S.reminderLabel}>Reminder time</span>
-                  <input type="time" value={pushTime} onChange={e => updatePushTime(e.target.value)}
-                    style={S.timeInput} />
-                </div>
-                <button onClick={disablePush} style={S.reminderOffBtn}>Turn off reminders</button>
-              </>
-            ) : (
-              <>
-                <div style={S.reminderRow}>
-                  <span style={S.reminderLabel}>Remind me daily at</span>
-                  <input type="time" value={pushTime} onChange={e => setPushTime(e.target.value)}
-                    style={S.timeInput} />
-                </div>
-                <button onClick={enablePush} disabled={pushLoading} style={S.reminderOnBtn}>
-                  {pushLoading ? "Setting up…" : "Enable reminders"}
-                </button>
-                {pushError && <p style={{ fontSize:12, color:"#c07070", margin:0, lineHeight:1.5 }}>{pushError}</p>}
-              </>
-            )}
-          </div>
-        )}
+          {showIosGuide && (
+            <div style={S.iosGuide}>
+              <p style={S.iosGuideTitle}>Add to your Home Screen first:</p>
+              <div style={S.iosStep}><span style={S.iosStepNum}>1</span><span>Open this page in <strong style={{color:C.cream}}>Safari</strong> (not Chrome)</span></div>
+              <div style={S.iosStep}><span style={S.iosStepNum}>2</span><span>Tap the <strong style={{color:C.cream}}>Share</strong> button <span style={{fontSize:16}}>⎋</span> at the bottom</span></div>
+              <div style={S.iosStep}><span style={S.iosStepNum}>3</span><span>Tap <strong style={{color:C.cream}}>Add to Home Screen</strong></span></div>
+              <div style={S.iosStep}><span style={S.iosStepNum}>4</span><span>Open the app from your Home Screen and come back here</span></div>
+              <button onClick={() => setShowIosGuide(false)} style={S.iosDismiss}>Got it</button>
+            </div>
+          )}
+
+          {pushSupported === "ios-unsupported" && (
+            <p style={{ fontSize:12, color:C.muted, margin:0, lineHeight:1.6 }}>
+              Daily reminders require iOS 16.4 or later. Please update your iPhone to use this feature.
+            </p>
+          )}
+
+          {pushSupported === true && (
+            <div style={S.reminderControls}>
+              {pushEnabled ? (
+                <>
+                  <div style={S.reminderRow}>
+                    <span style={S.reminderLabel}>Reminder time</span>
+                    <input type="time" value={pushTime} onChange={e => updatePushTime(e.target.value)}
+                      style={S.timeInput} />
+                  </div>
+                  <button onClick={disablePush} style={S.reminderOffBtn}>Turn off reminders</button>
+                </>
+              ) : (
+                <>
+                  <div style={S.reminderRow}>
+                    <span style={S.reminderLabel}>Remind me daily at</span>
+                    <input type="time" value={pushTime} onChange={e => setPushTime(e.target.value)}
+                      style={S.timeInput} />
+                  </div>
+                  <button onClick={enablePush} disabled={pushLoading} style={S.reminderOnBtn}>
+                    {pushLoading ? "Setting up…" : "Enable reminders"}
+                  </button>
+                  {pushError && <p style={{ fontSize:12, color:"#c07070", margin:0, lineHeight:1.5 }}>{pushError}</p>}
+                </>
+              )}
+            </div>
+          )}
+        </>)}
       </div>
 
       {/* Admin footer link */}
