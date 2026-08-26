@@ -889,6 +889,8 @@ export default function App() {
   const [addGrade, setAddGrade] = useState("");
   const [addBday, setAddBday] = useState("");
   const [peopleSort, setPeopleSort] = useState("name");
+  const [rosterGroup, setRosterGroup] = useState("ms"); // ms | hs | leader
+  const [rosterSort, setRosterSort] = useState("name"); // name | grade | birthday
 
   function addPerson() {
     if (!addName.trim()) return;
@@ -1108,7 +1110,7 @@ export default function App() {
 
       {/* Tabs */}
       <nav style={S.tabs}>
-        {[["pray","Pray"],["week","Week"]].map(([v, label]) => (
+        {[["pray","Pray"],["week","Week"],["roster","Roster"]].map(([v, label]) => (
           <button key={v} onClick={() => setView(v)} style={{ ...S.tab, ...(view === v ? S.tabActive : {}) }}>{label}</button>
         ))}
         {adminAuthed && [["people","People"],["import","Import"]].map(([v, label]) => (
@@ -1606,6 +1608,77 @@ export default function App() {
             </div>
             </div>
           )}
+        </div>
+      )}
+
+
+      {/* ─── ROSTER ─── */}
+      {view === "roster" && (
+        <div style={S.importWrap}>
+          {/* Group filter */}
+          <div style={{ display:"flex", gap:0, marginBottom:12, borderRadius:10, overflow:"hidden", border:`1px solid ${C.border}` }}>
+            {[["ms","MS"],["hs","HS"],["leader","Leaders"]].map(([val, label]) => (
+              <button key={val} onClick={() => setRosterGroup(val)} style={{ flex:1, background: rosterGroup === val ? C.accent : C.surface, border:"none", color: rosterGroup === val ? "#fff" : C.muted, padding:"9px 0", fontSize:13, fontWeight: rosterGroup === val ? 600 : 400, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif", transition:"background 0.15s" }}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sort filter */}
+          <div style={{ display:"flex", gap:16, marginBottom:12, justifyContent:"center" }}>
+            {[["name","A–Z"],["grade","Grade"],["birthday","Birthday"]].map(([val, label]) => (
+              <button key={val} onClick={() => setRosterSort(val)} style={{ background:"none", border:"none", borderBottom: rosterSort === val ? `2px solid ${C.accent}` : "2px solid transparent", color: rosterSort === val ? C.cream : C.muted, fontSize:13, fontWeight: rosterSort === val ? 500 : 400, padding:"2px 0", cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif" }}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* People list */}
+          <div style={{ display:"flex", flexDirection:"column", gap:1 }}>
+            {activePeople
+              .filter(p => rosterGroup === "leader" ? p.type === "leader" : p.group === rosterGroup)
+              .slice().sort((a, b) => {
+                if (rosterSort === "grade") {
+                  const ga = Number(a.grade) || 99;
+                  const gb = Number(b.grade) || 99;
+                  return ga !== gb ? ga - gb : a.name.localeCompare(b.name);
+                }
+                if (rosterSort === "birthday") {
+                  const ma = a.birthday ? parseInt(a.birthday.split("-")[0] || "99") : 99;
+                  const da = a.birthday ? parseInt(a.birthday.split("-")[1] || "99") : 99;
+                  const mb = b.birthday ? parseInt(b.birthday.split("-")[0] || "99") : 99;
+                  const db = b.birthday ? parseInt(b.birthday.split("-")[1] || "99") : 99;
+                  return ma !== mb ? ma - mb : da !== db ? da - db : a.name.localeCompare(b.name);
+                }
+                return a.name.localeCompare(b.name);
+              })
+              .map(p => {
+                const bdayFmt = p.birthday ? (() => { const [m, d] = p.birthday.split("-"); const date = new Date(2000, parseInt(m)-1, parseInt(d)); return date.toLocaleDateString("en-US", { month:"short", day:"numeric" }); })() : null;
+                return (
+                  <div key={p.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"11px 14px", background:C.surface, borderRadius:8, gap:8 }}>
+                    <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
+                      <span style={{ fontSize:15, color:C.cream, fontFamily:"'Lora', Georgia, serif" }}>{p.name}</span>
+                      <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                        {p.type === "student" && p.grade && (
+                          <span style={{ fontSize:11, color:C.muted }}>{ordinal(p.grade)} Grade</span>
+                        )}
+                        {p.type === "leader" && p.group && (
+                          <span style={{ fontSize:11, color:C.muted }}>{p.group.toUpperCase()}</span>
+                        )}
+                        {bdayFmt && <span style={{ fontSize:11, color:C.muted, display:"flex", alignItems:"center", gap:3 }}><Cake size={10} />{bdayFmt}</span>}
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", gap:4 }}>
+                      {p.group && <span style={{ fontSize:10, fontWeight:600, color: p.group === "hs" ? "#7aafc4" : C.accent, background: p.group === "hs" ? C.studentBg : C.accentBg, borderRadius:6, padding:"2px 7px" }}>{p.group.toUpperCase()}</span>}
+                    </div>
+                  </div>
+                );
+              })
+            }
+            {activePeople.filter(p => rosterGroup === "leader" ? p.type === "leader" : p.group === rosterGroup).length === 0 && (
+              <p style={{ textAlign:"center", color:C.muted, fontSize:13, padding:"32px 0" }}>No one in this group yet.</p>
+            )}
+          </div>
         </div>
       )}
 
