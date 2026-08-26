@@ -1928,8 +1928,8 @@ const S = {
   // MODAL
   modalOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 },
   modalBox: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: "28px 24px", width: "100%", maxWidth: 320, display: "flex", flexDirection: "column", gap: 14 },
-  modalTitle: { fontFamily: "'Lora', Georgia, serif", fontSize: 22, color: "#e2cfb0", margin: 0, textAlign: "center" },
-  modalInput: { background: C.bg, border: "1px solid #2e2518", borderRadius: 10, color: "#e2cfb0", padding: "12px 14px", fontSize: 16, fontFamily: "'Inter', system-ui, sans-serif", outline: "none", textAlign: "center", letterSpacing: "0.08em" },
+  modalTitle: { fontFamily: "'Lora', Georgia, serif", fontSize: 22, color: C.cream, margin: 0, textAlign: "center" },
+  modalInput: { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, color: C.cream, padding: "12px 14px", fontSize: 16, fontFamily: "'Inter', system-ui, sans-serif", outline: "none", textAlign: "center", letterSpacing: "0.08em" },
   modalError: { fontSize: 12, color: "#c07070", margin: 0, textAlign: "center" },
   modalBtns: { display: "flex", gap: 8 },
   // DROPDOWN
