@@ -1078,6 +1078,7 @@ export default function App() {
       {/* Header */}
       <header style={S.header}>
         <div style={S.logoWrap}>
+          <Star size={16} fill={C.accent} color={C.accent} style={{ flexShrink:0, marginTop:2 }} />
           <div style={{ display:"flex", flexDirection:"column", lineHeight:1 }}>
             <span style={S.logoText}>Calvary Students</span>
             <span style={S.logoSub}>Let’s Pray</span>
