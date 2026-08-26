@@ -1078,7 +1078,7 @@ export default function App() {
       {/* Header */}
       <header style={S.header}>
         <div style={S.logoWrap}>
-          <Star size={16} fill={C.accent} color={C.accent} style={{ flexShrink:0, marginTop:2 }} />
+          <svg width="16" height="16" viewBox="0 0 20 20" style={{ flexShrink:0, marginTop:2 }}><path d="M10,2 L11.768,8.232 L18,10 L11.768,11.768 L10,18 L8.232,11.768 L2,10 L8.232,8.232 Z" fill="#6b9e78" /></svg>
           <div style={{ display:"flex", flexDirection:"column", lineHeight:1 }}>
             <span style={S.logoText}>Calvary Students</span>
             <span style={S.logoSub}>Let’s Pray</span>
