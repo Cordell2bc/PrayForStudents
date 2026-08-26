@@ -1192,7 +1192,7 @@ export default function App() {
                   <div style={{ ...S.cardGhost, transform: "rotate(2deg) translateY(6px)", opacity: 0.35 }} />
                   <div style={{ ...S.cardGhost, transform: "rotate(-1.5deg) translateY(3px)", opacity: 0.55 }} />
                   <div style={{ ...S.card, ...S.tapCard }}>
-                    <Star size={28} color={C.accent} fill={C.accent} style={{ marginBottom: 8 }} />
+                    <svg width="28" height="28" viewBox="0 0 20 20" style={{ marginBottom: 8, flexShrink:0 }}><path d="M10,2 L11.768,8.232 L18,10 L11.768,11.768 L10,18 L8.232,11.768 L2,10 L8.232,8.232 Z" fill="#6b9e78" /></svg>
                     <h2 style={S.tapTitle}>Tap to Begin</h2>
                     <p style={S.tapSub}>{deck.length} {filter === "all" ? "people" : filter.replace("-", " ")} ready</p>
                   </div>
