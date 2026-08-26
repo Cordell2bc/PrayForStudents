@@ -1086,7 +1086,7 @@ export default function App() {
         <div style={{ ...S.weekBar, cursor: "pointer" }} onClick={() => setView("week")}>
           <Heart size={13} color={C.accent} fill={C.accent} />
           <span style={S.weekText}>{prayedCount >= activePeople.length ? praySessionCount : prayedCount} / {activePeople.length} this week</span>
-          {urgentBdays > 0 && <span style={{ ...S.bdayAlert, ...(upcomingBdays.some(b => b.diff === 0) ? { animation:"bdayGlow 1.6s ease-in-out infinite" } : {}) }}><Cake size={12} /><span style={{lineHeight:1}}>{urgentBdays}</span></span>}
+          {urgentBdays > 0 && <span style={{ ...S.bdayAlert, ...(upcomingBdays.some(b => b.diff === 0 && !isBdayDismissed(b.person.id)) ? { animation:"bdayGlow 1.6s ease-in-out infinite" } : {}) }}><Cake size={12} /><span style={{lineHeight:1}}>{urgentBdays}</span></span>}
         </div>
       </header>
 
@@ -1366,7 +1366,7 @@ export default function App() {
                 <div key={person.id} onClick={() => goToPerson(person.id)} style={{ ...S.weekRow, ...(diff === 0 ? { background: C.faint } : {}), cursor: "pointer" }}>
                   <div>
                     <div style={S.weekName}>{person.name}</div>
-                    <div style={S.weekMeta}>{diff === 0 ? "🎉 Today!" : diff === 1 ? "Tomorrow" : date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
+                    <div style={{ ...S.weekMeta, display:"flex", alignItems:"center", gap:4 }}>{diff === 0 && <Cake size={11} color={C.accent} />}{diff === 0 ? "Today!" : diff === 1 ? "Tomorrow" : date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
                   </div>
                   <div style={{ display: "flex", gap: 4 }}>
                     {person.group && <span style={{ ...S.badgeSm, ...(person.group === "hs" ? S.hsBadgeSm : S.msBadgeSm) }}>{person.group.toUpperCase()}</span>}
