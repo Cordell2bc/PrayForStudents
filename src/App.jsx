@@ -1080,7 +1080,7 @@ export default function App() {
           <span style={S.logoText}>Calvary Students</span>
         </div>
         <div style={{ ...S.weekBar, cursor: "pointer" }} onClick={() => setView("week")}>
-          <Heart size={13} color=C.accent fill=C.accent />
+          <Heart size={13} color={C.accent} fill={C.accent} />
           <span style={S.weekText}>{prayedCount >= activePeople.length ? praySessionCount : prayedCount} / {activePeople.length} this week</span>
           {urgentBdays > 0 && <span style={{ ...S.bdayAlert, ...(upcomingBdays.some(b => b.diff === 0) ? { animation:"bdayGlow 1.6s ease-in-out infinite" } : {}) }}><span style={{lineHeight:1}}>🎂</span><span style={{lineHeight:1}}>{urgentBdays}</span></span>}
         </div>
@@ -1146,7 +1146,7 @@ export default function App() {
           {deck.length === 0 && !pinnedPerson && !keepPrayingMode ? (
             activePeople.length === 0 ? (
               <div style={S.empty}>
-                <BookOpen size={40} color=C.muted />
+                <BookOpen size={40} color={C.muted} />
                 <p style={S.emptyTitle}>No one here yet</p>
                 <p style={S.emptySub}>Add people in the People tab or import a CSV.</p>
               </div>
@@ -1292,7 +1292,7 @@ export default function App() {
 
                   {withinWeek(current?.prayedAt) && !pinnedPerson && !keepPrayingMode ? (
                     <div style={S.prayedActions}>
-                      <div style={S.prayedConfirm}><Heart size={16} fill=C.prayedGreen color=C.prayedGreen style={{ marginRight: 7 }} /> Prayed!</div>
+                      <div style={S.prayedConfirm}><Heart size={16} fill={C.prayedGreen} color={C.prayedGreen} style={{ marginRight: 7 }} /> Prayed!</div>
                       {!pinnedPerson && <button onClick={unmarkPrayed} style={S.undoBtn}>Undo</button>}
                       {pinnedPerson && <button onClick={() => setPinnedPersonId(null)} style={S.undoBtn}>Back</button>}
                     </div>
