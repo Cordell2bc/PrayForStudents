@@ -501,12 +501,14 @@ export default function App() {
   const [editNameFor, setEditNameFor] = useState(null);
   const [nameInput, setNameInput] = useState("");
   const [confirmPromo, setConfirmPromo] = useState(false);
+  const [confirmClearInactive, setConfirmClearInactive] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushTime, setPushTime] = useState(() => localStorage.getItem("intercede-push-time") || "09:00");
   const [showIosGuide, setShowIosGuide] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [pushError, setPushError] = useState("");
+  const [reminderExpanded, setReminderExpanded] = useState(() => { try { return localStorage.getItem('intercede-reminder-expanded') !== 'false'; } catch { return true; } });
   const [weekHistory, setWeekHistory] = useState([]);
   const [bdayInput, setBdayInput] = useState("");
 
@@ -886,6 +888,7 @@ export default function App() {
 
   const [addGrade, setAddGrade] = useState("");
   const [addBday, setAddBday] = useState("");
+  const [peopleSort, setPeopleSort] = useState("name");
 
   function addPerson() {
     if (!addName.trim()) return;
@@ -908,6 +911,11 @@ export default function App() {
 
   function deactivate(id) { setPeople(prev => prev.map(p => p.id === id ? { ...p, active: false, updatedAt: Date.now() } : p)); }
   function restore(id) { setPeople(prev => prev.map(p => p.id === id ? { ...p, active: true, updatedAt: Date.now() } : p)); }
+  function clearAllInactive() {
+    setPeople(prev => prev.filter(p => p.active !== false));
+    setConfirmClearInactive(false);
+  }
+
   function deletePerm(id) { setPeople(prev => prev.filter(p => p.id !== id)); }
 
   function saveBirthday(id, val) {
@@ -1026,6 +1034,8 @@ export default function App() {
       localStorage.setItem("intercede-push-time", pushTime);
       localStorage.setItem("intercede-push-hash", hash);
       setPushEnabled(true);
+      setReminderExpanded(false);
+      try { localStorage.setItem('intercede-reminder-expanded', 'false'); } catch (_e) {}
     } catch (e) {
       setPushError("Error: " + (e.message || "Could not enable notifications."));
     }
@@ -1078,10 +1088,10 @@ export default function App() {
       {/* Header */}
       <header style={S.header}>
         <div style={S.logoWrap}>
-          <svg width="16" height="16" viewBox="0 0 20 20" style={{ flexShrink:0, marginTop:2 }}><path d="M10,2 L11.768,8.232 L18,10 L11.768,11.768 L10,18 L8.232,11.768 L2,10 L8.232,8.232 Z" fill={C.accent} /></svg>
+          <svg width="16" height="16" viewBox="0 0 20 20" style={{ flexShrink:0, marginTop:2 }}><path d="M10,2 L11.768,8.232 L18,10 L11.768,11.768 L10,18 L8.232,11.768 L2,10 L8.232,8.232 Z" fill="#6b9e78" /></svg>
           <div style={{ display:"flex", flexDirection:"column", lineHeight:1 }}>
-            <span style={S.logoText}>Calvary Students</span>
-            <span style={S.logoSub}>Let’s Pray</span>
+            <span style={S.logoText}>Let’s Pray</span>
+            <span style={S.logoSub}>Calvary Students</span>
           </div>
         </div>
         <div style={{ ...S.weekBar, cursor: "pointer" }} onClick={() => setView("week")}>
@@ -1190,7 +1200,7 @@ export default function App() {
                   <div style={{ ...S.cardGhost, transform: "rotate(2deg) translateY(6px)", opacity: 0.35 }} />
                   <div style={{ ...S.cardGhost, transform: "rotate(-1.5deg) translateY(3px)", opacity: 0.55 }} />
                   <div style={{ ...S.card, ...S.tapCard }}>
-                    <Star size={28} color={C.accent} fill={C.accent} style={{ marginBottom: 8 }} />
+                    <svg width="52" height="52" viewBox="0 0 20 20" style={{ marginBottom: 12, flexShrink:0 }}><path d="M10,2 L11.768,8.232 L18,10 L11.768,11.768 L10,18 L8.232,11.768 L2,10 L8.232,8.232 Z" fill="#6b9e78" /></svg>
                     <h2 style={S.tapTitle}>Tap to Begin</h2>
                     <p style={S.tapSub}>{deck.length} {filter === "all" ? "people" : filter.replace("-", " ")} ready</p>
                   </div>
@@ -1460,9 +1470,37 @@ export default function App() {
           </div>
 
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search people…" style={{ ...S.addInput, marginBottom: 4 }} />
+          <div style={{ display:"flex", gap:16, marginBottom:10, justifyContent:"center" }}>
+            {[["name","A–Z"],["group","MS/HS"],["grade","Grade"],["birthday","Birthday"]].map(([val, label]) => (
+              <button key={val} onClick={() => setPeopleSort(val)} style={{ background:"none", border:"none", borderBottom: peopleSort === val ? `2px solid ${C.accent}` : "2px solid transparent", color: peopleSort === val ? C.cream : C.muted, fontSize:13, fontWeight: peopleSort === val ? 500 : 400, padding:"2px 0", cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif", transition:"color 0.15s" }}>
+                {label}
+              </button>
+            ))}
+          </div>
 
           <div style={S.personList}>
-            {activePeople.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)).map(p => (
+            {activePeople.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).slice().sort((a, b) => {
+              if (peopleSort === "group") {
+                const ga = a.group === "ms" ? 0 : a.group === "hs" ? 1 : 2;
+                const gb = b.group === "ms" ? 0 : b.group === "hs" ? 1 : 2;
+                return ga !== gb ? ga - gb : a.name.localeCompare(b.name);
+              }
+              if (peopleSort === "grade") {
+                if (a.type === "leader" && b.type !== "leader") return 1;
+                if (a.type !== "leader" && b.type === "leader") return -1;
+                const ga = Number(a.grade) || 99;
+                const gb = Number(b.grade) || 99;
+                return ga !== gb ? ga - gb : a.name.localeCompare(b.name);
+              }
+              if (peopleSort === "birthday") {
+                const ma = a.birthday ? parseInt(a.birthday.split("-")[0] || "99") : 99;
+                const da = a.birthday ? parseInt(a.birthday.split("-")[1] || "99") : 99;
+                const mb = b.birthday ? parseInt(b.birthday.split("-")[0] || "99") : 99;
+                const db = b.birthday ? parseInt(b.birthday.split("-")[1] || "99") : 99;
+                return ma !== mb ? ma - mb : da !== db ? da - db : a.name.localeCompare(b.name);
+              }
+              return a.name.localeCompare(b.name);
+            }).map(p => (
               <div key={p.id} style={S.personCard}>
                 <div style={S.personRow}>
                   <div style={S.personLeft}>
@@ -1553,6 +1591,19 @@ export default function App() {
                   </div>
                 </div>
               ))}
+            </div>
+            <div style={{ display:"flex", justifyContent:"flex-end", marginTop:8 }}>
+              {!confirmClearInactive ? (
+                <button onClick={() => setConfirmClearInactive(true)} style={{ background:"none", border:"none", color:"#8a5050", fontSize:12, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif" }}>
+                  Clear all inactive…
+                </button>
+              ) : (
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <span style={{ fontSize:12, color:C.muted }}>Remove all inactive?</span>
+                  <button onClick={clearAllInactive} style={{ background:"#8a5050", border:"none", color:"#fff", borderRadius:6, padding:"5px 12px", fontSize:12, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif" }}>Yes, clear</button>
+                  <button onClick={() => setConfirmClearInactive(false)} style={S.cancelBtn}>Cancel</button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1658,59 +1709,69 @@ export default function App() {
       )}
       {/* Reminders section */}
       <div style={S.reminderSection}>
-        <div style={{ display:"flex", alignItems:"center", gap:8 }}><Bell size={14} color={C.muted} /><p style={S.reminderTitle}>Daily Reminders</p></div>
-
-        {/* iOS not on home screen */}
-        {pushSupported === "ios-prompt" && !showIosGuide && (
-          <button onClick={() => setShowIosGuide(true)} style={S.reminderSetupBtn}>
-            Set up reminders on iPhone
-          </button>
-        )}
-
-        {showIosGuide && (
-          <div style={S.iosGuide}>
-            <p style={S.iosGuideTitle}>Add to your Home Screen first:</p>
-            <div style={S.iosStep}><span style={S.iosStepNum}>1</span><span>Open this page in <strong style={{color:C.cream}}>Safari</strong> (not Chrome)</span></div>
-            <div style={S.iosStep}><span style={S.iosStepNum}>2</span><span>Tap the <strong style={{color:C.cream}}>Share</strong> button <span style={{fontSize:16}}>⎋</span> at the bottom</span></div>
-            <div style={S.iosStep}><span style={S.iosStepNum}>3</span><span>Tap <strong style={{color:C.cream}}>Add to Home Screen</strong></span></div>
-            <div style={S.iosStep}><span style={S.iosStepNum}>4</span><span>Open the app from your Home Screen and come back here</span></div>
-            <button onClick={() => setShowIosGuide(false)} style={S.iosDismiss}>Got it</button>
+        {/* Header row — always visible, tappable to expand/collapse */}
+        <button onClick={() => setReminderExpanded(e => { const next = !e; try { localStorage.setItem("intercede-reminder-expanded", String(next)); } catch (_e) {} return next; })} style={{ background:"none", border:"none", padding:0, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"space-between", width:"100%" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <Bell size={14} color={pushEnabled ? C.accent : C.muted} />
+            <p style={{ ...S.reminderTitle, color: pushEnabled ? C.accent : C.muted, margin:0 }}>
+              {pushEnabled ? `Reminders on · ${pushTime}` : "Daily Reminders"}
+            </p>
           </div>
-        )}
+          <span style={{ fontSize:10, color:C.muted, opacity:0.6 }}>{reminderExpanded ? "▲" : "▼"}</span>
+        </button>
 
-        {/* Push supported (Android or iOS on home screen) */}
-        {pushSupported === "ios-unsupported" && (
-          <p style={{ fontSize:12, color:C.muted, margin:0, lineHeight:1.6 }}>
-            Daily reminders require iOS 16.4 or later. Please update your iPhone to use this feature.
-          </p>
-        )}
+        {reminderExpanded && (<>
+          {/* iOS not on home screen */}
+          {pushSupported === "ios-prompt" && !showIosGuide && (
+            <button onClick={() => setShowIosGuide(true)} style={S.reminderSetupBtn}>
+              Set up reminders on iPhone
+            </button>
+          )}
 
-        {pushSupported === true && (
-          <div style={S.reminderControls}>
-            {pushEnabled ? (
-              <>
-                <div style={S.reminderRow}>
-                  <span style={S.reminderLabel}>Reminder time</span>
-                  <input type="time" value={pushTime} onChange={e => updatePushTime(e.target.value)}
-                    style={S.timeInput} />
-                </div>
-                <button onClick={disablePush} style={S.reminderOffBtn}>Turn off reminders</button>
-              </>
-            ) : (
-              <>
-                <div style={S.reminderRow}>
-                  <span style={S.reminderLabel}>Remind me daily at</span>
-                  <input type="time" value={pushTime} onChange={e => setPushTime(e.target.value)}
-                    style={S.timeInput} />
-                </div>
-                <button onClick={enablePush} disabled={pushLoading} style={S.reminderOnBtn}>
-                  {pushLoading ? "Setting up…" : "Enable reminders"}
-                </button>
-                {pushError && <p style={{ fontSize:12, color:"#c07070", margin:0, lineHeight:1.5 }}>{pushError}</p>}
-              </>
-            )}
-          </div>
-        )}
+          {showIosGuide && (
+            <div style={S.iosGuide}>
+              <p style={S.iosGuideTitle}>Add to your Home Screen first:</p>
+              <div style={S.iosStep}><span style={S.iosStepNum}>1</span><span>Open this page in <strong style={{color:C.cream}}>Safari</strong> (not Chrome)</span></div>
+              <div style={S.iosStep}><span style={S.iosStepNum}>2</span><span>Tap the <strong style={{color:C.cream}}>Share</strong> button <span style={{fontSize:16}}>⎋</span> at the bottom</span></div>
+              <div style={S.iosStep}><span style={S.iosStepNum}>3</span><span>Tap <strong style={{color:C.cream}}>Add to Home Screen</strong></span></div>
+              <div style={S.iosStep}><span style={S.iosStepNum}>4</span><span>Open the app from your Home Screen and come back here</span></div>
+              <button onClick={() => setShowIosGuide(false)} style={S.iosDismiss}>Got it</button>
+            </div>
+          )}
+
+          {pushSupported === "ios-unsupported" && (
+            <p style={{ fontSize:12, color:C.muted, margin:0, lineHeight:1.6 }}>
+              Daily reminders require iOS 16.4 or later. Please update your iPhone to use this feature.
+            </p>
+          )}
+
+          {pushSupported === true && (
+            <div style={S.reminderControls}>
+              {pushEnabled ? (
+                <>
+                  <div style={S.reminderRow}>
+                    <span style={S.reminderLabel}>Reminder time</span>
+                    <input type="time" value={pushTime} onChange={e => updatePushTime(e.target.value)}
+                      style={S.timeInput} />
+                  </div>
+                  <button onClick={disablePush} style={S.reminderOffBtn}>Turn off reminders</button>
+                </>
+              ) : (
+                <>
+                  <div style={S.reminderRow}>
+                    <span style={S.reminderLabel}>Remind me daily at</span>
+                    <input type="time" value={pushTime} onChange={e => setPushTime(e.target.value)}
+                      style={S.timeInput} />
+                  </div>
+                  <button onClick={enablePush} disabled={pushLoading} style={S.reminderOnBtn}>
+                    {pushLoading ? "Setting up…" : "Enable reminders"}
+                  </button>
+                  {pushError && <p style={{ fontSize:12, color:"#c07070", margin:0, lineHeight:1.5 }}>{pushError}</p>}
+                </>
+              )}
+            </div>
+          )}
+        </>)}
       </div>
 
       {/* Admin footer link */}
@@ -1750,7 +1811,7 @@ const S = {
   header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 20px 0" },
   logoWrap: { display: "flex", alignItems: "center", gap: 8 },
   logoCross: { fontSize: 18, color: C.accent },
-  logoText: { fontFamily: "'Lora', Georgia, serif", fontSize: 22, fontWeight: 600, color: C.cream, letterSpacing: "0.02em" },
+  logoText: { fontFamily: "'Lora', Georgia, serif", fontSize: 24, fontWeight: 600, color: C.cream, letterSpacing: "0.01em" },
   weekBar: { display: "flex", alignItems: "center", gap: 6, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: "5px 12px" },
   weekText: { fontSize: 12, color: C.muted },
   bdayAlert: { fontSize: 11, background: C.faint, color: C.accent, borderRadius: 10, padding: "2px 7px 2px 6px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 3, verticalAlign: "middle" },
@@ -1775,7 +1836,7 @@ const S = {
   emptySub: { fontSize: 13, color: C.faint, margin: 0, textAlign: "center" },
   cardOuter: { position: "relative", margin: "0 0 20px", touchAction: "pan-y" },
   cardGhost: { position: "absolute", inset: 0, background: "#242729", borderRadius: 16, border: `1px solid ${C.border}`, boxShadow: "0 4px 16px rgba(0,0,0,0.4)" },
-  card: { position: "relative", background: `repeating-linear-gradient(${C.card}, ${C.card} 27px, #2e3235 27px, #2e3235 28px)`, backgroundPositionY: "52px", border: `1px solid ${C.border}`, borderTop: "1px solid #3a3f43", borderRadius: 16, padding: "28px 24px 22px", display: "flex", flexDirection: "column", gap: 0, boxShadow: "0 2px 0 rgba(255,255,255,0.03) inset, 0 12px 48px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4)", userSelect: "none" },
+  card: { position: "relative", background: `repeating-linear-gradient(${C.card}, ${C.card} 27px, #2e3235 27px, #2e3235 28px)`, backgroundPositionY: "52px", border: `1px solid ${C.border}`, borderTop: `1px solid ${C.accent}44`, borderRadius: 16, padding: "28px 24px 22px", display: "flex", flexDirection: "column", gap: 0, boxShadow: `0 2px 0 ${C.accent}18 inset, 0 12px 48px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4)`, userSelect: "none" },
   cardDone: { background: "#1d2620", borderColor: "#3a5040", borderTop: "1px solid #4a6050" },
   badge: { display: "inline-flex", alignSelf: "flex-start", padding: "3px 11px", borderRadius: 12, fontSize: 11, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 14 },
   studentBadge: { background: C.studentBg, color: C.student, border: `1px solid ${C.student}33` },
@@ -1915,8 +1976,8 @@ const S = {
   // MODAL
   modalOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 },
   modalBox: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: "28px 24px", width: "100%", maxWidth: 320, display: "flex", flexDirection: "column", gap: 14 },
-  modalTitle: { fontFamily: "'Lora', Georgia, serif", fontSize: 22, color: "#e2cfb0", margin: 0, textAlign: "center" },
-  modalInput: { background: C.bg, border: "1px solid #2e2518", borderRadius: 10, color: "#e2cfb0", padding: "12px 14px", fontSize: 16, fontFamily: "'Inter', system-ui, sans-serif", outline: "none", textAlign: "center", letterSpacing: "0.08em" },
+  modalTitle: { fontFamily: "'Lora', Georgia, serif", fontSize: 22, color: C.cream, margin: 0, textAlign: "center" },
+  modalInput: { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, color: C.cream, padding: "12px 14px", fontSize: 16, fontFamily: "'Inter', system-ui, sans-serif", outline: "none", textAlign: "center", letterSpacing: "0.08em" },
   modalError: { fontSize: 12, color: "#c07070", margin: 0, textAlign: "center" },
   modalBtns: { display: "flex", gap: 8 },
   // DROPDOWN
