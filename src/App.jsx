@@ -1222,6 +1222,7 @@ export default function App() {
                       ...(cardAnim === "entering-left" ? { animation: "flyInLeft  0.3s cubic-bezier(.22,.68,0,1.2) forwards" } : {}),
                       ...(cardAnim === "entering-right"? { animation: "flyInRight 0.3s cubic-bezier(.22,.68,0,1.2) forwards" } : {}),
                     }}>
+                      {/* Badge row */}
                       <div style={S.badgeRow}>
                         <div style={{ ...S.badge, ...(current?.type === "leader" ? S.leaderBadge : S.studentBadge) }}>
                           {current?.type === "leader" ? "Leader" : "Student"}
@@ -1237,20 +1238,30 @@ export default function App() {
                           </div>
                         )}
                       </div>
+
+                      {/* Name — primary */}
                       <h2 style={S.cardName}>{current?.name}</h2>
 
+                      {/* Birthday — secondary info, below name */}
                       {bdayStatus && (
-                        <div style={{ ...S.bdayChip, ...(bdayStatus.urgent ? S.bdayChipUrgent : {}), ...(bdayStatus.today && !isBdayDismissed(current?.id) ? { animation: "bdayGlow 1.6s ease-in-out infinite", fontSize: 13, padding: "6px 14px" } : {}) }}><Cake size={13} style={{ marginRight:5, flexShrink:0, ...(bdayStatus.today ? { animation:"bdaySpin 2s ease-in-out infinite" } : {}) }} />{bdayStatus.label.replace("🎂 ", "")}</div>
+                        <div style={{ ...S.bdayChip, ...(bdayStatus.urgent ? S.bdayChipUrgent : {}), ...(bdayStatus.today && !isBdayDismissed(current?.id) ? { animation: "bdayGlow 1.6s ease-in-out infinite", fontSize: 14, padding: "7px 16px" } : {}) }}>
+                          <Cake size={14} style={{ marginRight:6, flexShrink:0, ...(bdayStatus.today ? { animation:"bdaySpin 2s ease-in-out infinite" } : {}) }} />
+                          {bdayStatus.label.replace("🎂 ", "")}
+                        </div>
                       )}
                       {current?.birthday && !bdayStatus && (
-                        <div style={S.bdayQuiet}><Cake size={11} style={{ marginRight: 5, opacity: 0.5 }} />{formatBirthday(current.birthday)}</div>
+                        <div style={S.bdayQuiet}>
+                          <Cake size={12} style={{ marginRight: 6, opacity: 0.5 }} />
+                          <span>{formatBirthday(current.birthday)}</span>
+                        </div>
                       )}
 
+                      {/* Last prayed — tertiary */}
                       <div style={S.cardPrayedRow}>
                         {withinWeek(current?.prayedAt) ? (
                           <span style={S.prayedChip}>✓ Prayed {timeAgo(current.prayedAt)}</span>
                         ) : current?.prayedAt ? (
-                          <span style={S.lastPrayedChip}>Last: {timeAgo(current.prayedAt)}</span>
+                          <span style={S.lastPrayedChip}>Last Prayed For On: {timeAgo(current.prayedAt)}</span>
                         ) : (
                           <span style={S.neverChip}>Not yet prayed for</span>
                         )}
@@ -1768,14 +1779,14 @@ const S = {
   badge: { display: "inline-flex", alignSelf: "flex-start", padding: "3px 11px", borderRadius: 12, fontSize: 11, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 14 },
   studentBadge: { background: C.studentBg, color: C.student, border: `1px solid ${C.student}33` },
   leaderBadge: { background: C.leaderBg, color: C.leader, border: `1px solid ${C.leader}33` },
-  cardName: { fontFamily: "'Lora', Georgia, serif", fontSize: 36, fontWeight: 500, lineHeight: 1.15, color: C.cream, margin: "0 0 10px", letterSpacing: "-0.01em" },
-  bdayChip: { display: "inline-flex", alignItems: "center", background: C.faint, border: `1px solid #5a3e10`, color: C.accent, borderRadius: 10, padding: "4px 10px", fontSize: 12, marginBottom: 10 },
-  bdayChipUrgent: { background: C.accentBg, borderColor: C.accent, color: C.accentLight, fontWeight: 500 },
-  bdayQuiet: { display: "flex", alignItems: "center", fontSize: 11, color: C.muted, marginBottom: 8 },
-  cardPrayedRow: { marginBottom: 18 },
+  cardName: { fontFamily: "'Lora', Georgia, serif", fontSize: 34, fontWeight: 500, lineHeight: 1.2, color: C.cream, margin: "6px 0 12px", letterSpacing: "-0.01em" },
+  bdayChip: { display: "inline-flex", alignItems: "center", background: C.faint, border: `1px solid ${C.border}`, color: C.accent, borderRadius: 10, padding: "5px 12px", fontSize: 14, marginBottom: 12, gap: 4 },
+  bdayChipUrgent: { background: C.accentBg, border: `1px solid ${C.accent}`, color: C.accentLight, fontWeight: 500 },
+  bdayQuiet: { display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: C.muted, marginBottom: 10 },
+  cardPrayedRow: { marginBottom: 18, marginTop: 4 },
   prayedChip: { fontSize: 12, color: C.prayedGreen, background: C.accentBg, padding: "3px 10px", borderRadius: 10 },
-  lastPrayedChip: { fontSize: 12, color: C.muted },
-  neverChip: { fontSize: 12, color: "#5a4a3a", fontStyle: "italic" },
+  lastPrayedChip: { fontSize: 13, color: C.muted, lineHeight: 1.4 },
+  neverChip: { fontSize: 13, color: C.muted, fontStyle: "italic" },
   reqBox: { background: C.faint, borderRadius: 10, padding: "12px 14px", marginBottom: 14 },
   reqLabel: { fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 8px" },
   reqItem: { display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 6 },
@@ -1895,7 +1906,7 @@ const S = {
   reminderRow: { display: "flex", alignItems: "center", justifyContent: "space-between" },
   reminderLabel: { fontSize: 13, color: C.muted },
   timeInput: { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, color: C.cream, padding: "6px 10px", fontSize: 13, fontFamily: "'Inter', system-ui, sans-serif", outline: "none", cursor: "pointer" },
-  reminderOnBtn: { background: C.accent, border: "none", color: "#fff", borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" }, #b8821e)`, border: "none", color: C.bg, borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
+    reminderOnBtn: { background: C.accent, border: "none", color: "#fff", borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
   reminderOffBtn: { background: "none", border: `1px solid ${C.border}`, color: "#8a5050", borderRadius: 10, padding: "9px 0", fontSize: 12, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
   // ADMIN FOOTER
   adminFooter: { display: "flex", justifyContent: "center", padding: "12px 0 20px", marginTop: "auto" },
@@ -1913,7 +1924,7 @@ const S = {
   ddList: { background: C.surface, border: `1px solid ${C.border}`, borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: 260, overflowY: "auto", display: "flex", flexDirection: "column" },
   ddItem: { background: "none", border: "none", borderBottom: `1px solid ${C.faint}`, color: C.cream, padding: "11px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif", display: "flex", justifyContent: "space-between", alignItems: "center", textAlign: "left" },
   ddItemPrayed: { color: C.muted },
-  ddItemMeta: { fontSize: 11, color: C.faint, marginLeft: 8, flexShrink: 0 },
+  ddItemMeta: { fontSize: 11, color: C.muted, marginLeft: 8, flexShrink: 0, background: C.faint, borderRadius: 6, padding: "2px 7px" },
   // TAP TO BEGIN
   tapCard: { cursor: "pointer", alignItems: "center", justifyContent: "center", minHeight: 220, gap: 10, animation: "tapPulse 2s ease-in-out infinite" },
   tapCross: { fontSize: 28, color: C.accent, marginBottom: 8 },
