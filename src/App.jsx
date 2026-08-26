@@ -507,7 +507,7 @@ export default function App() {
   const [showIosGuide, setShowIosGuide] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [pushError, setPushError] = useState("");
-  const [reminderExpanded, setReminderExpanded] = useState(!pushEnabled);
+  const [reminderExpanded, setReminderExpanded] = useState(() => { try { return localStorage.getItem('intercede-reminder-expanded') !== 'false'; } catch { return true; } });
   const [weekHistory, setWeekHistory] = useState([]);
   const [bdayInput, setBdayInput] = useState("");
 
@@ -1028,6 +1028,7 @@ export default function App() {
       localStorage.setItem("intercede-push-hash", hash);
       setPushEnabled(true);
       setReminderExpanded(false);
+      try { localStorage.setItem('intercede-reminder-expanded', 'false'); } catch (_e) {}
     } catch (e) {
       setPushError("Error: " + (e.message || "Could not enable notifications."));
     }
@@ -1192,7 +1193,7 @@ export default function App() {
                   <div style={{ ...S.cardGhost, transform: "rotate(2deg) translateY(6px)", opacity: 0.35 }} />
                   <div style={{ ...S.cardGhost, transform: "rotate(-1.5deg) translateY(3px)", opacity: 0.55 }} />
                   <div style={{ ...S.card, ...S.tapCard }}>
-                    <svg width="28" height="28" viewBox="0 0 20 20" style={{ marginBottom: 8, flexShrink:0 }}><path d="M10,2 L11.768,8.232 L18,10 L11.768,11.768 L10,18 L8.232,11.768 L2,10 L8.232,8.232 Z" fill="#6b9e78" /></svg>
+                    <svg width="52" height="52" viewBox="0 0 20 20" style={{ marginBottom: 12, flexShrink:0 }}><path d="M10,2 L11.768,8.232 L18,10 L11.768,11.768 L10,18 L8.232,11.768 L2,10 L8.232,8.232 Z" fill="#6b9e78" /></svg>
                     <h2 style={S.tapTitle}>Tap to Begin</h2>
                     <p style={S.tapSub}>{deck.length} {filter === "all" ? "people" : filter.replace("-", " ")} ready</p>
                   </div>
@@ -1661,7 +1662,7 @@ export default function App() {
       {/* Reminders section */}
       <div style={S.reminderSection}>
         {/* Header row — always visible, tappable to expand/collapse */}
-        <button onClick={() => setReminderExpanded(e => !e)} style={{ background:"none", border:"none", padding:0, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"space-between", width:"100%" }}>
+        <button onClick={() => setReminderExpanded(e => { const next = !e; try { localStorage.setItem("intercede-reminder-expanded", String(next)); } catch (_e) {} return next; })} style={{ background:"none", border:"none", padding:0, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"space-between", width:"100%" }}>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             <Bell size={14} color={pushEnabled ? C.accent : C.muted} />
             <p style={{ ...S.reminderTitle, color: pushEnabled ? C.accent : C.muted, margin:0 }}>
