@@ -19,7 +19,7 @@ function shouldShowTap() {
     const raw = localStorage.getItem(TAP_KEY);
     if (!raw) return true;
     return Date.now() - Number(raw) > TAP_TTL;
-  } catch { return true; }
+  } catch (_e) { return true; }
 }
 
 function getBdayDismissKey(personId) {
@@ -27,7 +27,7 @@ function getBdayDismissKey(personId) {
   return `intercede-bday-dismissed-${personId}-${today}`;
 }
 function isBdayDismissed(personId) {
-  try { return !!localStorage.getItem(getBdayDismissKey(personId)); } catch { return false; }
+  try { return !!localStorage.getItem(getBdayDismissKey(personId)); } catch (_e) { return false; }
 }
 function dismissBday(personId) {
   try { localStorage.setItem(getBdayDismissKey(personId), "1"); } catch (_e) {}
@@ -45,7 +45,7 @@ function isAdminAuthed() {
     if (!raw) return false;
     const { ts } = JSON.parse(raw);
     return Date.now() - ts < ADMIN_TTL;
-  } catch { return false; }
+  } catch (_e) { return false; }
 }
 
 function setAdminAuthed() {
@@ -462,7 +462,7 @@ function AllPrayedScreen({ prayedCount, praySessionCount, total, onWeek, onKeepP
           <CountdownTicker targetTs={nextMonday} />
         </div>
       )}
-      <button onClick={() => onKeepPraying()} style={{ background:`linear-gradient(135deg, #c9982a, #b8821e)`, border:"none", color:C.bg, borderRadius:12, padding:"13px 28px", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif", boxShadow:"0 4px 20px rgba(201,152,42,0.3)" }}>
+      <button onClick={() => onKeepPraying()} style={{ background:C.accent, border:"none", color:C.bg, borderRadius:12, padding:"13px 28px", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif", boxShadow:"0 4px 20px rgba(201,152,42,0.3)" }}>
         Keep Praying
       </button>
       <button onClick={onWeek} style={{ background:"none", border:"1px solid #2e2518", color:"#7d6a52", borderRadius:10, padding:"10px 20px", fontSize:13, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif" }}>
@@ -1167,7 +1167,7 @@ export default function App() {
                 <Heart size={36} fill={C.prayedGreen} color={C.prayedGreen} />
                 <p style={S.emptyTitle}>All prayed for!</p>
                 <p style={S.emptySub}>Everyone in this group has been prayed for this week.</p>
-                <button onClick={() => startKeepPraying(getFiltered())} style={{ background:`linear-gradient(135deg, #c9982a, #b8821e)`, border:"none", color:C.bg, borderRadius:12, padding:"13px 28px", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif", boxShadow:"0 4px 20px rgba(201,152,42,0.3)", marginTop:8 }}>
+                <button onClick={() => startKeepPraying(getFiltered())} style={{ background:C.accent, border:"none", color:C.bg, borderRadius:12, padding:"13px 28px", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif", boxShadow:"0 4px 20px rgba(201,152,42,0.3)", marginTop:8 }}>
                   Keep Praying
                 </button>
               </div>
@@ -1726,9 +1726,9 @@ const C = {
   student: "#5b8fa8",   // steel blue
   studentBg: "#1a262e", // dark blue
   leader: "#6b9e78",    // sage (same as accent)
-  leaderBg: C.accentBg,  // dark sage
+  leaderBg: "#1e2820",
   prayedGreen: "#6b9e78",
-  prayedBg: C.accentBg,
+  prayedBg: "#1e2820",
 };
 
 /* ── Styles ─────────────────────────────────────────────── */
