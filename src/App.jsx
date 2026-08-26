@@ -1371,7 +1371,7 @@ export default function App() {
               : prayedThis.map(p => (
                 <div key={p.id} onClick={() => goToPerson(p.id)} style={{ ...S.weekRow, cursor: "pointer" }}>
                   <div>
-                    <div style={{ ...S.weekName, display:"flex", alignItems:"center", gap:6 }}>{p.name}{(p.weekPrayCount || 0) >= 2 ? <span style={{ fontSize:11, color:C.gold, fontWeight:700, background:C.faint, padding:"1px 6px", borderRadius:8 }}>x{p.weekPrayCount}</span> : null}</div>
+                    <div style={{ ...S.weekName, display:"flex", alignItems:"center", gap:6 }}>{p.name}{(p.weekPrayCount || 0) >= 2 ? <span style={{ fontSize:11, color:C.accent, fontWeight:700, background:C.faint, padding:"1px 6px", borderRadius:8 }}>x{p.weekPrayCount}</span> : null}</div>
                     <div style={S.weekMeta}>{timeAgo(p.prayedAt)}</div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1472,7 +1472,7 @@ export default function App() {
                   </div>
                   <div style={S.personActions}>
                     <button onClick={() => { setEditBdayFor(editBdayFor === p.id ? null : p.id); setBdayInput(p.birthday || ""); setEditNameFor(null); }}
-                      style={{ ...S.iconBtn, color: p.birthday ? C.gold : C.muted }} title="Set birthday"><Cake size={13} /></button>
+                      style={{ ...S.iconBtn, color: p.birthday ? C.accent : C.muted }} title="Set birthday"><Cake size={13} /></button>
                     <button onClick={() => cycleGroup(p.id)} style={{ ...S.iconBtn, color: p.group === "hs" ? "#7aafc4" : p.group === "ms" ? "#c49a6c" : C.muted }} title="Cycle HS/MS/none">
                       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.02em" }}>{p.group ? p.group.toUpperCase() : "—"}</span>
                     </button>
@@ -1719,7 +1719,7 @@ const C = {
   border: "#333839",    // subtle border
   accent: "#6b9e78",    // sage green
   accentLight: "#8eba95", // lighter sage
-  accentBg: C.accentBg,  // sage tinted bg
+  accentBg: "#1e2820",  // sage tinted bg
   cream: "#e8e0d4",     // warm white
   muted: "#7a8082",     // cool grey
   faint: "#2e3235",     // very dark grey
@@ -1736,7 +1736,7 @@ const S = {
   root: { minHeight: "100vh", background: C.bg, color: C.cream, fontFamily: "'Inter', system-ui, sans-serif", fontSize: 14, maxWidth: 480, margin: "0 auto", display: "flex", flexDirection: "column" },
   header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 20px 0" },
   logoWrap: { display: "flex", alignItems: "center", gap: 8 },
-  logoCross: { fontSize: 18, color: C.gold },
+  logoCross: { fontSize: 18, color: C.accent },
   logoText: { fontFamily: "'Lora', Georgia, serif", fontSize: 22, fontWeight: 600, color: C.cream, letterSpacing: "0.02em" },
   weekBar: { display: "flex", alignItems: "center", gap: 6, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: "5px 12px" },
   weekText: { fontSize: 12, color: C.muted },
