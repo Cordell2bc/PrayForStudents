@@ -887,6 +887,7 @@ export default function App() {
 
   const [addGrade, setAddGrade] = useState("");
   const [addBday, setAddBday] = useState("");
+  const [peopleSort, setPeopleSort] = useState("name");
 
   function addPerson() {
     if (!addName.trim()) return;
@@ -1463,9 +1464,37 @@ export default function App() {
           </div>
 
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search people…" style={{ ...S.addInput, marginBottom: 4 }} />
+          <div style={{ display:"flex", gap:6, marginBottom:8, flexWrap:"wrap" }}>
+            {[["name","A–Z"],["group","MS/HS"],["grade","Grade"],["birthday","Birthday"]].map(([val, label]) => (
+              <button key={val} onClick={() => setPeopleSort(val)} style={{ ...S.toggleOpt, ...(peopleSort === val ? S.toggleOptOn : {}), fontSize:11, padding:"5px 10px" }}>
+                {label}
+              </button>
+            ))}
+          </div>
 
           <div style={S.personList}>
-            {activePeople.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)).map(p => (
+            {activePeople.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).slice().sort((a, b) => {
+              if (peopleSort === "group") {
+                const ga = a.group === "ms" ? 0 : a.group === "hs" ? 1 : 2;
+                const gb = b.group === "ms" ? 0 : b.group === "hs" ? 1 : 2;
+                return ga !== gb ? ga - gb : a.name.localeCompare(b.name);
+              }
+              if (peopleSort === "grade") {
+                if (a.type === "leader" && b.type !== "leader") return 1;
+                if (a.type !== "leader" && b.type === "leader") return -1;
+                const ga = Number(a.grade) || 99;
+                const gb = Number(b.grade) || 99;
+                return ga !== gb ? ga - gb : a.name.localeCompare(b.name);
+              }
+              if (peopleSort === "birthday") {
+                const ma = a.birthday ? parseInt(a.birthday.split("-")[0] || "99") : 99;
+                const da = a.birthday ? parseInt(a.birthday.split("-")[1] || "99") : 99;
+                const mb = b.birthday ? parseInt(b.birthday.split("-")[0] || "99") : 99;
+                const db = b.birthday ? parseInt(b.birthday.split("-")[1] || "99") : 99;
+                return ma !== mb ? ma - mb : da !== db ? da - db : a.name.localeCompare(b.name);
+              }
+              return a.name.localeCompare(b.name);
+            }).map(p => (
               <div key={p.id} style={S.personCard}>
                 <div style={S.personRow}>
                   <div style={S.personLeft}>
