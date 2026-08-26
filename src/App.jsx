@@ -501,6 +501,7 @@ export default function App() {
   const [editNameFor, setEditNameFor] = useState(null);
   const [nameInput, setNameInput] = useState("");
   const [confirmPromo, setConfirmPromo] = useState(false);
+  const [confirmClearInactive, setConfirmClearInactive] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushTime, setPushTime] = useState(() => localStorage.getItem("intercede-push-time") || "09:00");
@@ -910,6 +911,11 @@ export default function App() {
 
   function deactivate(id) { setPeople(prev => prev.map(p => p.id === id ? { ...p, active: false, updatedAt: Date.now() } : p)); }
   function restore(id) { setPeople(prev => prev.map(p => p.id === id ? { ...p, active: true, updatedAt: Date.now() } : p)); }
+  function clearAllInactive() {
+    setPeople(prev => prev.filter(p => p.active !== false));
+    setConfirmClearInactive(false);
+  }
+
   function deletePerm(id) { setPeople(prev => prev.filter(p => p.id !== id)); }
 
   function saveBirthday(id, val) {
@@ -1464,9 +1470,9 @@ export default function App() {
           </div>
 
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search people…" style={{ ...S.addInput, marginBottom: 4 }} />
-          <div style={{ display:"flex", gap:6, marginBottom:8, flexWrap:"wrap" }}>
+          <div style={{ display:"flex", gap:16, marginBottom:10, justifyContent:"center" }}>
             {[["name","A–Z"],["group","MS/HS"],["grade","Grade"],["birthday","Birthday"]].map(([val, label]) => (
-              <button key={val} onClick={() => setPeopleSort(val)} style={{ ...S.toggleOpt, ...(peopleSort === val ? S.toggleOptOn : {}), fontSize:11, padding:"5px 10px" }}>
+              <button key={val} onClick={() => setPeopleSort(val)} style={{ background:"none", border:"none", borderBottom: peopleSort === val ? `2px solid ${C.accent}` : "2px solid transparent", color: peopleSort === val ? C.cream : C.muted, fontSize:13, fontWeight: peopleSort === val ? 500 : 400, padding:"2px 0", cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif", transition:"color 0.15s" }}>
                 {label}
               </button>
             ))}
@@ -1585,6 +1591,19 @@ export default function App() {
                   </div>
                 </div>
               ))}
+            </div>
+            <div style={{ display:"flex", justifyContent:"flex-end", marginTop:8 }}>
+              {!confirmClearInactive ? (
+                <button onClick={() => setConfirmClearInactive(true)} style={{ background:"none", border:"none", color:"#8a5050", fontSize:12, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif" }}>
+                  Clear all inactive…
+                </button>
+              ) : (
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <span style={{ fontSize:12, color:C.muted }}>Remove all inactive?</span>
+                  <button onClick={clearAllInactive} style={{ background:"#8a5050", border:"none", color:"#fff", borderRadius:6, padding:"5px 12px", fontSize:12, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif" }}>Yes, clear</button>
+                  <button onClick={() => setConfirmClearInactive(false)} style={S.cancelBtn}>Cancel</button>
+                </div>
+              )}
             </div>
           )}
         </div>
