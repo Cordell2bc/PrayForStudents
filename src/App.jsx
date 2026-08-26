@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, Heart, Plus, Trash2, Upload, X, RefreshCw, BookOpen, RotateCcw, Cake } from "lucide-react";
+import { ChevronLeft, ChevronRight, Heart, Plus, Trash2, Upload, X, RefreshCw, BookOpen, RotateCcw, Cake, BarChart2, Bell, Star, Lightbulb } from "lucide-react";
 
 const STORAGE_KEY = "intercede-people-v2";
 const ADMIN_PASSWORD = "Promo1398!";
@@ -446,7 +446,7 @@ function AllPrayedScreen({ prayedCount, praySessionCount, total, onWeek, onKeepP
       {/* Confetti is its own isolated component — never rerenders from countdown ticks */}
       {show && <Confetti />}
       <div style={{ fontSize:56, animation:"celebPulse 2s ease-in-out infinite", lineHeight:1 }}>🙏</div>
-      <h2 style={{ fontFamily:"'Cormorant Garamond', serif", fontSize:34, fontWeight:400, color:"#e2cfb0", margin:0, lineHeight:1.2 }}>
+      <h2 style={{ fontFamily:"'Lora', Georgia, serif", fontSize:34, fontWeight:400, color:"#e2cfb0", margin:0, lineHeight:1.2 }}>
         Everyone's been<br/>prayed for!
       </h2>
       <p style={{ fontSize:14, color:"#c9982a", margin:0, fontWeight:500 }}>
@@ -462,10 +462,10 @@ function AllPrayedScreen({ prayedCount, praySessionCount, total, onWeek, onKeepP
           <CountdownTicker targetTs={nextMonday} />
         </div>
       )}
-      <button onClick={() => onKeepPraying()} style={{ background:`linear-gradient(135deg, #c9982a, #b8821e)`, border:"none", color:"#0e0c09", borderRadius:12, padding:"13px 28px", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", boxShadow:"0 4px 20px rgba(201,152,42,0.3)" }}>
+      <button onClick={() => onKeepPraying()} style={{ background:`linear-gradient(135deg, #c9982a, #b8821e)`, border:"none", color:C.bg, borderRadius:12, padding:"13px 28px", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif", boxShadow:"0 4px 20px rgba(201,152,42,0.3)" }}>
         Keep Praying
       </button>
-      <button onClick={onWeek} style={{ background:"none", border:"1px solid #2e2518", color:"#7d6a52", borderRadius:10, padding:"10px 20px", fontSize:13, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+      <button onClick={onWeek} style={{ background:"none", border:"1px solid #2e2518", color:"#7d6a52", borderRadius:10, padding:"10px 20px", fontSize:13, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif" }}>
         View Week Summary →
       </button>
     </div>
@@ -572,7 +572,7 @@ export default function App() {
   useEffect(() => {
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap";
+    link.href = "https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap";
     document.head.appendChild(link);
     const style = document.createElement("style");
     style.textContent = `
@@ -1064,7 +1064,7 @@ export default function App() {
   }
 
   if (!loaded) {
-    return <div style={S.root}><p style={{ color: "#c4a882", fontFamily: "Cormorant Garamond, serif", textAlign: "center", marginTop: 80, fontSize: 20 }}>Loading…</p></div>;
+    return <div style={S.root}><p style={{ color: C.cream, fontFamily: "Lora, Georgia, serif", textAlign: "center", marginTop: 80, fontSize: 20 }}>Loading…</p></div>;
   }
 
   const bdayStatus = current ? getBirthdayStatus(current.birthday) : null;
@@ -1080,7 +1080,7 @@ export default function App() {
           <span style={S.logoText}>Calvary Students</span>
         </div>
         <div style={{ ...S.weekBar, cursor: "pointer" }} onClick={() => setView("week")}>
-          <Heart size={13} color="#d4916a" fill="#d4916a" />
+          <Heart size={13} color=C.accent fill=C.accent />
           <span style={S.weekText}>{prayedCount >= activePeople.length ? praySessionCount : prayedCount} / {activePeople.length} this week</span>
           {urgentBdays > 0 && <span style={{ ...S.bdayAlert, ...(upcomingBdays.some(b => b.diff === 0) ? { animation:"bdayGlow 1.6s ease-in-out infinite" } : {}) }}><span style={{lineHeight:1}}>🎂</span><span style={{lineHeight:1}}>{urgentBdays}</span></span>}
         </div>
@@ -1146,7 +1146,7 @@ export default function App() {
           {deck.length === 0 && !pinnedPerson && !keepPrayingMode ? (
             activePeople.length === 0 ? (
               <div style={S.empty}>
-                <BookOpen size={40} color="#5a4832" />
+                <BookOpen size={40} color=C.muted />
                 <p style={S.emptyTitle}>No one here yet</p>
                 <p style={S.emptySub}>Add people in the People tab or import a CSV.</p>
               </div>
@@ -1167,7 +1167,7 @@ export default function App() {
                 <Heart size={36} fill={C.prayedGreen} color={C.prayedGreen} />
                 <p style={S.emptyTitle}>All prayed for!</p>
                 <p style={S.emptySub}>Everyone in this group has been prayed for this week.</p>
-                <button onClick={() => startKeepPraying(getFiltered())} style={{ background:`linear-gradient(135deg, #c9982a, #b8821e)`, border:"none", color:"#0e0c09", borderRadius:12, padding:"13px 28px", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", boxShadow:"0 4px 20px rgba(201,152,42,0.3)", marginTop:8 }}>
+                <button onClick={() => startKeepPraying(getFiltered())} style={{ background:`linear-gradient(135deg, #c9982a, #b8821e)`, border:"none", color:C.bg, borderRadius:12, padding:"13px 28px", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif", boxShadow:"0 4px 20px rgba(201,152,42,0.3)", marginTop:8 }}>
                   Keep Praying
                 </button>
               </div>
@@ -1184,7 +1184,7 @@ export default function App() {
                   <div style={{ ...S.cardGhost, transform: "rotate(2deg) translateY(6px)", opacity: 0.35 }} />
                   <div style={{ ...S.cardGhost, transform: "rotate(-1.5deg) translateY(3px)", opacity: 0.55 }} />
                   <div style={{ ...S.card, ...S.tapCard }}>
-                    <div style={S.tapCross}>✦</div>
+                    <Star size={28} color={C.accent} fill={C.accent} style={{ marginBottom: 8 }} />
                     <h2 style={S.tapTitle}>Tap to Begin</h2>
                     <p style={S.tapSub}>{deck.length} {filter === "all" ? "people" : filter.replace("-", " ")} ready</p>
                   </div>
@@ -1284,7 +1284,7 @@ export default function App() {
                     <button onClick={() => navWithAnim(-1)} style={S.navArrow}><ChevronLeft size={22} /></button>
                     <span style={S.counter}>
                       {pinnedPerson ? "★" : `${cardIdx + 1}`}
-                      <span style={{ color: "#5a4832" }}> / </span>
+                      <span style={{ color: C.muted }}> / </span>
                       {deck.length}
                     </span>
                     <button onClick={() => navWithAnim(1)} style={S.navArrow}><ChevronRight size={22} /></button>
@@ -1292,7 +1292,7 @@ export default function App() {
 
                   {withinWeek(current?.prayedAt) && !pinnedPerson && !keepPrayingMode ? (
                     <div style={S.prayedActions}>
-                      <div style={S.prayedConfirm}><Heart size={16} fill="#9dc88d" color="#9dc88d" style={{ marginRight: 7 }} /> Prayed!</div>
+                      <div style={S.prayedConfirm}><Heart size={16} fill=C.prayedGreen color=C.prayedGreen style={{ marginRight: 7 }} /> Prayed!</div>
                       {!pinnedPerson && <button onClick={unmarkPrayed} style={S.undoBtn}>Undo</button>}
                       {pinnedPerson && <button onClick={() => setPinnedPersonId(null)} style={S.undoBtn}>Back</button>}
                     </div>
@@ -1343,11 +1343,11 @@ export default function App() {
           {upcomingBdays.length > 0 && (
             <div style={S.weekSection}>
               <div style={S.sectionHead}>
-                <Cake size={13} color={C.gold} style={{ marginRight: 7 }} />
+                <Cake size={13} color={C.accent} style={{ marginRight: 7 }} />
                 <span style={S.sectionTitle}>Upcoming Birthdays</span>
               </div>
               {upcomingBdays.map(({ person, diff, date }) => (
-                <div key={person.id} onClick={() => goToPerson(person.id)} style={{ ...S.weekRow, ...(diff === 0 ? { background: "#1e1608" } : {}), cursor: "pointer" }}>
+                <div key={person.id} onClick={() => goToPerson(person.id)} style={{ ...S.weekRow, ...(diff === 0 ? { background: C.faint } : {}), cursor: "pointer" }}>
                   <div>
                     <div style={S.weekName}>{person.name}</div>
                     <div style={S.weekMeta}>{diff === 0 ? "🎉 Today!" : diff === 1 ? "Tomorrow" : date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
@@ -1371,7 +1371,7 @@ export default function App() {
               : prayedThis.map(p => (
                 <div key={p.id} onClick={() => goToPerson(p.id)} style={{ ...S.weekRow, cursor: "pointer" }}>
                   <div>
-                    <div style={{ ...S.weekName, display:"flex", alignItems:"center", gap:6 }}>{p.name}{(p.weekPrayCount || 0) >= 2 ? <span style={{ fontSize:11, color:C.gold, fontWeight:700, background:"#241c0a", padding:"1px 6px", borderRadius:8 }}>x{p.weekPrayCount}</span> : null}</div>
+                    <div style={{ ...S.weekName, display:"flex", alignItems:"center", gap:6 }}>{p.name}{(p.weekPrayCount || 0) >= 2 ? <span style={{ fontSize:11, color:C.gold, fontWeight:700, background:C.faint, padding:"1px 6px", borderRadius:8 }}>x{p.weekPrayCount}</span> : null}</div>
                     <div style={S.weekMeta}>{timeAgo(p.prayedAt)}</div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1390,7 +1390,7 @@ export default function App() {
             </div>
             {notPrayedThis.length === 0 ? (
               <div style={S.allPrayedBanner}>
-                <Heart size={22} fill={C.gold} color={C.gold} />
+                <Heart size={22} fill={C.accent} color={C.accent} />
                 <span style={S.allPrayedText}>Everyone prayed for this week!</span>
               </div>
             ) : notPrayedThis.map(p => (
@@ -1477,12 +1477,12 @@ export default function App() {
                       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.02em" }}>{p.group ? p.group.toUpperCase() : "—"}</span>
                     </button>
                     <button onClick={() => toggleType(p.id)} style={S.iconBtn} title="Toggle role"><RefreshCw size={13} /></button>
-                    <button onClick={() => deactivate(p.id)} style={{ ...S.iconBtn, color: "#7a5040" }} title="Make inactive"><Trash2 size={13} /></button>
+                    <button onClick={() => deactivate(p.id)} style={{ ...S.iconBtn, color: C.muted }} title="Make inactive"><Trash2 size={13} /></button>
                   </div>
                 </div>
                 {editBdayFor === p.id && (
                   <div style={S.bdayEditRow}>
-                    <Cake size={13} style={{ color: C.gold, flexShrink: 0 }} />
+                    <Cake size={13} style={{ color: C.accent, flexShrink: 0 }} />
                     <input autoFocus value={bdayInput} onChange={e => setBdayInput(e.target.value)}
                       onKeyDown={e => { if (e.key === "Enter") saveBirthday(p.id, parseBirthdayStr(bdayInput)); if (e.key === "Escape") setEditBdayFor(null); }}
                       placeholder="MM-DD  e.g. 03-15" style={S.bdayInput} />
@@ -1544,13 +1544,13 @@ export default function App() {
           {/* Weekly prayer report */}
           <div style={S.reportBox}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
-              <p style={{ ...S.reportTitle, margin:0 }}>📊 Weekly Prayer Report</p>
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}><BarChart2 size={16} color={C.accent} /><p style={{ ...S.reportTitle, margin:0 }}>Weekly Prayer Report</p></div>
               <div style={{ display:"flex", gap:12 }}>
-                <button onClick={recalculateHistory} style={{ background:"none", border:"none", color:C.muted, fontSize:11, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+                <button onClick={recalculateHistory} style={{ background:"none", border:"none", color:C.muted, fontSize:11, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif" }}>
                   recalculate
                 </button>
                 {weekHistory.length > 0 && (
-                  <button onClick={async () => { setWeekHistory([]); await apiSaveHistory([]); }} style={{ background:"none", border:"none", color:"#3d3226", fontSize:11, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+                  <button onClick={async () => { setWeekHistory([]); await apiSaveHistory([]); }} style={{ background:"none", border:"none", color:"#3d3226", fontSize:11, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif" }}>
                     clear
                   </button>
                 )}
@@ -1586,19 +1586,19 @@ export default function App() {
 
           <div style={S.importRulesBox}>
             <div style={S.importRule}>
-              <span style={S.importRuleIcon}>👤</span>
+              <span style={{ ...S.importRuleIcon, fontFamily:"monospace", fontSize:13 }}>ID</span>
               <div>
                 <strong style={{ color: C.cream }}>Names</strong> — recognizes columns like <code style={S.code}>Name</code>, <code style={S.code}>First Name</code>, <code style={S.code}>Last Name</code>, <code style={S.code}>Student</code>. Separate first/last columns are joined automatically. "Smith, John" format is flipped to "John Smith".
               </div>
             </div>
             <div style={S.importRule}>
-              <span style={S.importRuleIcon}>🎂</span>
+              <Cake size={16} color={C.muted} style={{ flexShrink:0, marginTop:2 }} />
               <div>
                 <strong style={{ color: C.cream }}>Birthdays</strong> — recognizes <code style={S.code}>Birthday</code>, <code style={S.code}>DOB</code>, <code style={S.code}>Birthdate</code>. Accepts MM/DD, MM-DD, or "March 15".
               </div>
             </div>
             <div style={S.importRule}>
-              <span style={S.importRuleIcon}>📋</span>
+              <span style={{ ...S.importRuleIcon, fontFamily:"monospace", fontSize:13 }}>ST</span>
               <div>All imported people start as <strong style={{ color: C.cream }}>Students</strong>. Change roles in the People tab after importing.</div>
             </div>
           </div>
@@ -1634,7 +1634,7 @@ export default function App() {
           )}
 
           <div style={S.suggestBox}>
-            <p style={S.suggestTitle}>💡 Still on the roadmap</p>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}><Lightbulb size={14} color={C.accent} /><p style={S.suggestTitle}>Still on the roadmap</p></div>
             <ul style={S.suggestList}>
               {["Prayer streak — consecutive weeks praying for everyone", "Prayer history log — timestamped journal per person", "Groups — organize by small group, grade, or team", "Notes field — free-form notes per person", "Completed requests — mark a request answered and archive it"].map((s, i) => (
                 <li key={i} style={S.suggestItem}>{s}</li>
@@ -1645,7 +1645,7 @@ export default function App() {
       )}
       {/* Reminders section */}
       <div style={S.reminderSection}>
-        <p style={S.reminderTitle}>🔔 Daily Reminders</p>
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}><Bell size={14} color={C.muted} /><p style={S.reminderTitle}>Daily Reminders</p></div>
 
         {/* iOS not on home screen */}
         {pushSupported === "ios-prompt" && !showIosGuide && (
@@ -1713,95 +1713,107 @@ export default function App() {
 
 /* ── Colors ─────────────────────────────────────────────── */
 const C = {
-  bg: "#0e0c09", surface: "#1b1610", card: "#231d14", border: "#2e2518",
-  gold: "#c9982a", goldLight: "#e8b84b", cream: "#e2cfb0", muted: "#7d6a52", faint: "#3d3226",
-  student: "#4e84a0", studentBg: "#162533", leader: "#72966a", leaderBg: "#182115",
-  prayedGreen: "#8fc47f", prayedBg: "#131e10",
+  bg: "#1a1c1e",        // deep charcoal
+  surface: "#222527",   // slightly lighter charcoal
+  card: "#272b2e",      // card surface
+  border: "#333839",    // subtle border
+  accent: "#6b9e78",    // sage green
+  accentLight: "#8eba95", // lighter sage
+  accentBg: C.accentBg,  // sage tinted bg
+  cream: "#e8e0d4",     // warm white
+  muted: "#7a8082",     // cool grey
+  faint: "#2e3235",     // very dark grey
+  student: "#5b8fa8",   // steel blue
+  studentBg: "#1a262e", // dark blue
+  leader: "#6b9e78",    // sage (same as accent)
+  leaderBg: C.accentBg,  // dark sage
+  prayedGreen: "#6b9e78",
+  prayedBg: C.accentBg,
 };
 
 /* ── Styles ─────────────────────────────────────────────── */
 const S = {
-  root: { minHeight: "100vh", background: C.bg, color: C.cream, fontFamily: "'DM Sans', sans-serif", fontSize: 14, maxWidth: 480, margin: "0 auto", display: "flex", flexDirection: "column" },
+  root: { minHeight: "100vh", background: C.bg, color: C.cream, fontFamily: "'Inter', system-ui, sans-serif", fontSize: 14, maxWidth: 480, margin: "0 auto", display: "flex", flexDirection: "column" },
   header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 20px 0" },
   logoWrap: { display: "flex", alignItems: "center", gap: 8 },
   logoCross: { fontSize: 18, color: C.gold },
-  logoText: { fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: C.cream, letterSpacing: "0.04em" },
-  weekBar: { display: "flex", alignItems: "center", gap: 6, background: "#1f1810", border: `1px solid ${C.border}`, borderRadius: 20, padding: "5px 12px" },
+  logoText: { fontFamily: "'Lora', Georgia, serif", fontSize: 22, fontWeight: 600, color: C.cream, letterSpacing: "0.02em" },
+  weekBar: { display: "flex", alignItems: "center", gap: 6, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: "5px 12px" },
   weekText: { fontSize: 12, color: C.muted },
-  bdayAlert: { fontSize: 11, background: "#2a1e08", color: C.gold, borderRadius: 10, padding: "2px 7px 2px 6px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 3, verticalAlign: "middle" },
+  bdayAlert: { fontSize: 11, background: C.faint, color: C.accent, borderRadius: 10, padding: "2px 7px 2px 6px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 3, verticalAlign: "middle" },
   progressTrack: { margin: "14px 20px 0", height: 3, background: C.faint, borderRadius: 2, overflow: "hidden" },
-  progressFill: { height: "100%", background: `linear-gradient(90deg, ${C.gold}, ${C.goldLight})`, borderRadius: 2, transition: "width 0.6s ease" },
+  progressFill: { height: "100%", background: C.accent, borderRadius: 2, transition: "width 0.6s ease" },
   tabs: { display: "flex", borderBottom: `1px solid ${C.border}`, margin: "14px 0 0" },
-  tab: { flex: 1, background: "none", border: "none", color: C.muted, padding: "10px 0", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 400, letterSpacing: "0.04em", transition: "color 0.2s" },
-  tabActive: { color: C.goldLight, borderBottom: `2px solid ${C.gold}`, marginBottom: -1, fontWeight: 500 },
+  tab: { flex: 1, background: "none", border: "none", color: C.muted, padding: "10px 0", cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif", fontSize: 13, fontWeight: 400, letterSpacing: "0.04em", transition: "color 0.2s" },
+  tabActive: { color: C.cream, borderBottom: `2px solid ${C.accent}`, marginBottom: -1, fontWeight: 600 },
   // PRAY
   prayWrap: { flex: 1, display: "flex", flexDirection: "column", padding: "16px 20px 28px" },
   controls: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10 },
   togglePill: { display: "flex", background: C.faint, borderRadius: 20, padding: 2 },
-  toggleOpt: { background: "none", border: "none", color: C.muted, padding: "5px 14px", borderRadius: 18, cursor: "pointer", fontSize: 12, fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s" },
+  toggleOpt: { background: "none", border: "none", color: C.muted, padding: "5px 14px", borderRadius: 18, cursor: "pointer", fontSize: 12, fontFamily: "'Inter', system-ui, sans-serif", transition: "all 0.2s" },
   toggleOptOn: { background: C.surface, color: C.cream, fontWeight: 500 },
-  filterSelect: { background: C.faint, border: `1px solid ${C.border}`, color: C.muted, borderRadius: 20, padding: "5px 12px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", outline: "none", flex: 1 },
+  filterSelect: { background: C.faint, border: `1px solid ${C.border}`, color: C.muted, borderRadius: 20, padding: "5px 12px", fontSize: 12, fontFamily: "'Inter', system-ui, sans-serif", cursor: "pointer", outline: "none", flex: 1 },
   reshuffleBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 20, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 },
-  bdayDismiss: { position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#5a3e10", cursor:"pointer", fontSize:14, padding:"4px 6px", lineHeight:1 },
-  bdayBanner: { background: "#2a1e08", border: `1px solid ${C.gold}`, borderRadius: 12, color: C.goldLight, padding: "12px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", textAlign: "center", width: "100%", marginBottom: 8, animation: "bdayGlow 1.6s ease-in-out infinite" },
-  swipeHint: { fontSize: 11, color: "#3a3020", textAlign: "center", marginBottom: 8, letterSpacing: "0.05em" },
+  bdayDismiss: { position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:C.border, cursor:"pointer", fontSize:14, padding:"4px 6px", lineHeight:1 },
+  bdayBanner: { background: C.faint, border: `1px solid ${C.accent}`, borderRadius: 12, color: C.accentLight, padding: "12px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif", textAlign: "center", width: "100%", marginBottom: 8, animation: "bdayGlow 1.6s ease-in-out infinite" },
+  swipeHint: { fontSize: 11, color: C.faint, textAlign: "center", marginBottom: 8, letterSpacing: "0.05em" },
   empty: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, paddingBottom: 60 },
-  emptyTitle: { fontFamily: "'Cormorant Garamond', serif", fontSize: 22, color: C.muted, margin: 0 },
+  emptyTitle: { fontFamily: "'Lora', Georgia, serif", fontSize: 22, color: C.muted, margin: 0 },
   emptySub: { fontSize: 13, color: C.faint, margin: 0, textAlign: "center" },
   cardOuter: { position: "relative", margin: "0 0 20px", touchAction: "pan-y" },
-  cardGhost: { position: "absolute", inset: 0, background: C.card, borderRadius: 18, border: `1px solid ${C.border}` },
-  card: { position: "relative", background: C.card, border: `1px solid ${C.border}`, borderRadius: 18, padding: "28px 24px 22px", display: "flex", flexDirection: "column", gap: 0, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", userSelect: "none" },
-  cardDone: { background: C.prayedBg, borderColor: "#2a3d24" },
+  cardGhost: { position: "absolute", inset: 0, background: "#242729", borderRadius: 16, border: `1px solid ${C.border}`, boxShadow: "0 4px 16px rgba(0,0,0,0.4)" },
+  card: { position: "relative", background: `linear-gradient(160deg, #2e3235 0%, ${C.card} 100%)`, border: `1px solid ${C.border}`, borderTop: "1px solid #3a3f43", borderRadius: 16, padding: "28px 24px 22px", display: "flex", flexDirection: "column", gap: 0, boxShadow: "0 2px 0 rgba(255,255,255,0.03) inset, 0 12px 48px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4)", userSelect: "none" },
+  cardDone: { background: "#1d2620", borderColor: "#3a5040", borderTop: "1px solid #4a6050" },
   badge: { display: "inline-flex", alignSelf: "flex-start", padding: "3px 11px", borderRadius: 12, fontSize: 11, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 14 },
   studentBadge: { background: C.studentBg, color: C.student, border: `1px solid ${C.student}33` },
   leaderBadge: { background: C.leaderBg, color: C.leader, border: `1px solid ${C.leader}33` },
-  cardName: { fontFamily: "'Cormorant Garamond', serif", fontSize: 40, fontWeight: 400, lineHeight: 1.1, color: C.cream, margin: "0 0 10px" },
-  bdayChip: { display: "inline-flex", alignItems: "center", background: "#221a08", border: `1px solid #5a3e10`, color: C.gold, borderRadius: 10, padding: "4px 10px", fontSize: 12, marginBottom: 10 },
-  bdayChipUrgent: { background: "#2e1e04", borderColor: C.gold, color: C.goldLight, fontWeight: 500 },
-  bdayQuiet: { display: "flex", alignItems: "center", fontSize: 11, color: "#4a3e2a", marginBottom: 8 },
+  cardName: { fontFamily: "'Lora', Georgia, serif", fontSize: 36, fontWeight: 500, lineHeight: 1.15, color: C.cream, margin: "0 0 10px", letterSpacing: "-0.01em" },
+  bdayChip: { display: "inline-flex", alignItems: "center", background: C.faint, border: `1px solid #5a3e10`, color: C.accent, borderRadius: 10, padding: "4px 10px", fontSize: 12, marginBottom: 10 },
+  bdayChipUrgent: { background: C.accentBg, borderColor: C.accent, color: C.accentLight, fontWeight: 500 },
+  bdayQuiet: { display: "flex", alignItems: "center", fontSize: 11, color: C.muted, marginBottom: 8 },
   cardPrayedRow: { marginBottom: 18 },
-  prayedChip: { fontSize: 12, color: C.prayedGreen, background: "#1a2e18", padding: "3px 10px", borderRadius: 10 },
+  prayedChip: { fontSize: 12, color: C.prayedGreen, background: C.accentBg, padding: "3px 10px", borderRadius: 10 },
   lastPrayedChip: { fontSize: 12, color: C.muted },
   neverChip: { fontSize: 12, color: "#5a4a3a", fontStyle: "italic" },
-  reqBox: { background: "#1a150e", borderRadius: 10, padding: "12px 14px", marginBottom: 14 },
+  reqBox: { background: C.faint, borderRadius: 10, padding: "12px 14px", marginBottom: 14 },
   reqLabel: { fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 8px" },
   reqItem: { display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 6 },
-  reqDot: { color: C.gold, fontSize: 8, marginTop: 3, flexShrink: 0 },
-  reqText: { flex: 1, fontSize: 13, color: "#c4b090", lineHeight: 1.4 },
-  reqRemove: { background: "none", border: "none", color: "#5a4832", cursor: "pointer", padding: 2, display: "flex", flexShrink: 0 },
+  reqDot: { color: C.accent, fontSize: 8, marginTop: 3, flexShrink: 0 },
+  reqText: { flex: 1, fontSize: 13, color: C.cream, lineHeight: 1.4 },
+  reqRemove: { background: "none", border: "none", color: C.muted, cursor: "pointer", padding: 2, display: "flex", flexShrink: 0 },
   reqInputRow: { display: "flex", gap: 6, alignItems: "center", marginTop: 4 },
-  reqInput: { flex: 1, background: "#1a150e", border: `1px solid ${C.border}`, borderRadius: 8, color: C.cream, padding: "7px 10px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none" },
-  reqAddBtn: { background: C.gold, border: "none", color: "#0e0c09", borderRadius: 8, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  reqInput: { flex: 1, background: C.faint, border: `1px solid ${C.border}`, borderRadius: 8, color: C.cream, padding: "7px 10px", fontSize: 13, fontFamily: "'Inter', system-ui, sans-serif", outline: "none" },
+  reqAddBtn: { background: C.accent, border: "none", color: "#fff", borderRadius: 8, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
   reqCancelBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
-  addReqTrigger: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", alignSelf: "flex-start", marginTop: 8, fontFamily: "'DM Sans', sans-serif" },
+  addReqTrigger: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", alignSelf: "flex-start", marginTop: 8, fontFamily: "'Inter', system-ui, sans-serif" },
   navRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 20, marginBottom: 16 },
   navArrow: { background: C.surface, border: `1px solid ${C.border}`, color: C.muted, borderRadius: "50%", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
-  counter: { fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: C.muted, minWidth: 60, textAlign: "center" },
-  prayBtn: { background: `linear-gradient(135deg, ${C.gold}, #b8821e)`, border: "none", color: "#0e0c09", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif", boxShadow: "0 4px 20px rgba(201,152,42,0.3)" },
+  counter: { fontFamily: "'Lora', Georgia, serif", fontSize: 18, color: C.muted, minWidth: 60, textAlign: "center" },
+  prayBtn: { background: C.accent, border: "none", color: "#fff", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', system-ui, sans-serif", boxShadow: `0 4px 24px rgba(107,158,120,0.4)`, letterSpacing: "0.02em" },
   prayedActions: { display: "flex", alignItems: "center", justifyContent: "center", gap: 12 },
   prayedConfirm: { display: "flex", alignItems: "center", color: C.prayedGreen, fontSize: 15, fontWeight: 500 },
-  undoBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: "6px 14px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  undoBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: "6px 14px", fontSize: 12, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
   // WEEK
   weekWrap: { flex: 1, padding: "16px 20px 32px", display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" },
-  weekTitle: { fontFamily: "'Cormorant Garamond', serif", fontSize: 28, color: C.cream, margin: 0, fontWeight: 400 },
+  weekTitle: { fontFamily: "'Lora', Georgia, serif", fontSize: 28, color: C.cream, margin: 0, fontWeight: 400 },
   weekSection: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" },
-  sectionHead: { display: "flex", alignItems: "center", padding: "11px 14px", borderBottom: `1px solid ${C.border}`, background: "#161109" },
+  sectionHead: { display: "flex", alignItems: "center", padding: "11px 14px", borderBottom: `1px solid ${C.border}`, background: C.bg },
   sectionTitle: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: "0.09em", fontWeight: 500 },
   weekRow: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderBottom: `1px solid ${C.faint}` },
   weekName: { fontSize: 14, color: C.cream },
   weekMeta: { fontSize: 11, color: C.muted, marginTop: 2 },
-  weekEmpty: { fontSize: 13, color: "#3a3020", padding: "16px 14px", margin: 0, textAlign: "center", fontStyle: "italic" },
+  weekEmpty: { fontSize: 13, color: C.faint, padding: "16px 14px", margin: 0, textAlign: "center", fontStyle: "italic" },
   allPrayedBanner: { display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "22px 14px" },
-  allPrayedText: { fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: C.gold, textAlign: "center" },
+  allPrayedText: { fontFamily: "'Lora', Georgia, serif", fontSize: 18, color: C.accent, textAlign: "center" },
   // PEOPLE
   peopleWrap: { flex: 1, padding: "16px 20px 28px", display: "flex", flexDirection: "column", gap: 10 },
   addRow: { display: "flex", gap: 8 },
-  addInput: { flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, color: C.cream, padding: "10px 12px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none" },
-  addTypeSelect: { background: C.surface, border: `1px solid ${C.border}`, color: C.muted, borderRadius: 10, padding: "10px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", outline: "none" },
-  addPersonBtn: { background: C.gold, border: "none", color: "#0e0c09", borderRadius: 10, width: 42, height: 42, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 },
+  addInput: { flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, color: C.cream, padding: "10px 12px", fontSize: 13, fontFamily: "'Inter', system-ui, sans-serif", outline: "none" },
+  addTypeSelect: { background: C.surface, border: `1px solid ${C.border}`, color: C.muted, borderRadius: 10, padding: "10px 10px", fontSize: 12, fontFamily: "'Inter', system-ui, sans-serif", cursor: "pointer", outline: "none" },
+  addPersonBtn: { background: C.accent, border: "none", color: "#fff", borderRadius: 10, width: 42, height: 42, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 },
   statRow: { display: "flex", gap: 6 },
   statChip: { flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 },
-  statNum: { fontSize: 18, fontFamily: "'Cormorant Garamond', serif", color: C.cream },
+  statNum: { fontSize: 18, fontFamily: "'Lora', Georgia, serif", color: C.cream },
   statLbl: { fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em" },
   personList: { display: "flex", flexDirection: "column", gap: 4 },
   personCard: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" },
@@ -1813,42 +1825,42 @@ const S = {
   studentBadgeSm: { background: C.studentBg, color: C.student },
   leaderBadgeSm: { background: C.leaderBg, color: C.leader },
   prayedSmall: { fontSize: 11, color: C.prayedGreen },
-  reqCountBadge: { fontSize: 11, color: C.gold, background: "#241c0a", padding: "1px 7px", borderRadius: 8 },
-  bdayBadgeSm: { display: "inline-flex", alignItems: "center", fontSize: 10, color: "#8a7040", background: "#1e1608", padding: "1px 7px", borderRadius: 8 },
+  reqCountBadge: { fontSize: 11, color: C.accent, background: C.faint, padding: "1px 7px", borderRadius: 8 },
+  bdayBadgeSm: { display: "inline-flex", alignItems: "center", fontSize: 10, color: C.muted, background: C.faint, padding: "1px 7px", borderRadius: 8 },
   personActions: { display: "flex", gap: 6 },
   iconBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
-  gradeBadge: { fontSize: 10, padding: "2px 7px", borderRadius: 8, background: "#1e1a10", color: "#9a8850", fontWeight: 500 },
-  gradeBadgeLg: { background: "#1e1a10", color: "#9a8850", border: "1px solid #9a885033", marginBottom: 0 },
-  gradeRow: { display: "flex", alignItems: "center", gap: 10, padding: "7px 12px", borderTop: `1px solid ${C.faint}`, background: "#141108" },
+  gradeBadge: { fontSize: 10, padding: "2px 7px", borderRadius: 8, background: C.faint, color: C.muted, fontWeight: 500 },
+  gradeBadgeLg: { background: C.faint, color: C.muted, border: "1px solid #9a885033", marginBottom: 0 },
+  gradeRow: { display: "flex", alignItems: "center", gap: 10, padding: "7px 12px", borderTop: `1px solid ${C.faint}`, background: C.surface },
   gradeLabel: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0 },
-  gradeSelect: { background: "#0e0c09", border: `1px solid ${C.border}`, borderRadius: 7, color: C.cream, padding: "4px 8px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", outline: "none" },
+  gradeSelect: { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, color: C.cream, padding: "4px 8px", fontSize: 13, fontFamily: "'Inter', system-ui, sans-serif", cursor: "pointer", outline: "none" },
   promoteSection: { marginTop: 4 },
-  promoteBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 10, padding: "11px 16px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", width: "100%", textAlign: "left" },
+  promoteBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 10, padding: "11px 16px", fontSize: 13, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif", width: "100%", textAlign: "left" },
   promoteConfirm: { background: "#1a150a", border: `1px solid #3a2e10`, borderRadius: 10, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 },
   promoteConfirmText: { fontSize: 13, color: C.cream, margin: 0, lineHeight: 1.5 },
   nameRow: { display: "flex", alignItems: "center", gap: 6 },
   editNameBtn: { background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 13, padding: "0 2px", lineHeight: 1 },
   nameEditRow: { display: "flex", alignItems: "center", gap: 6, marginBottom: 2 },
-  nameInput: { flex: 1, background: "#0e0c09", border: `1px solid ${C.border}`, borderRadius: 8, color: C.cream, padding: "5px 8px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", minWidth: 0 },
-  bdayEditRow: { display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderTop: `1px solid ${C.faint}`, background: "#171209" },
-  bdayInput: { flex: 1, background: "#0e0c09", border: `1px solid ${C.border}`, borderRadius: 8, color: C.cream, padding: "6px 10px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none" },
+  nameInput: { flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, color: C.cream, padding: "5px 8px", fontSize: 13, fontFamily: "'Inter', system-ui, sans-serif", outline: "none", minWidth: 0 },
+  bdayEditRow: { display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderTop: `1px solid ${C.faint}`, background: C.surface },
+  bdayInput: { flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, color: C.cream, padding: "6px 10px", fontSize: 13, fontFamily: "'Inter', system-ui, sans-serif", outline: "none" },
   inactiveSection: { marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 12 },
   inactiveHeading: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 8px" },
   inactiveRow: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${C.faint}` },
   inactiveName: { fontSize: 13, color: C.muted },
-  restoreBtn: { background: "none", border: `1px solid ${C.border}`, color: C.leader, borderRadius: 7, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-  deleteBtn: { background: "none", border: `1px solid #3a1a1a`, color: "#8a5050", borderRadius: 7, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  restoreBtn: { background: "none", border: `1px solid ${C.border}`, color: C.leader, borderRadius: 7, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
+  deleteBtn: { background: "none", border: `1px solid #3a1a1a`, color: "#8a5050", borderRadius: 7, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
   // IMPORT
   importWrap: { flex: 1, padding: "16px 20px 28px", display: "flex", flexDirection: "column", gap: 12, overflowY: "auto" },
-  importTitle: { fontFamily: "'Cormorant Garamond', serif", fontSize: 26, color: C.cream, margin: 0, fontWeight: 400 },
+  importTitle: { fontFamily: "'Lora', Georgia, serif", fontSize: 26, color: C.cream, margin: 0, fontWeight: 400 },
   importDesc: { fontSize: 13, color: C.muted, margin: 0 },
   importNote: { fontSize: 12, color: C.muted, margin: "0" },
   importRulesBox: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "4px 0", display: "flex", flexDirection: "column" },
   importRule: { display: "flex", gap: 12, padding: "11px 14px", borderBottom: `1px solid ${C.faint}`, fontSize: 12, color: C.muted, lineHeight: 1.5, alignItems: "flex-start" },
   importRuleIcon: { fontSize: 16, flexShrink: 0, marginTop: 1 },
-  code: { background: C.faint, padding: "1px 6px", borderRadius: 4, fontSize: 11, color: C.gold, fontFamily: "monospace" },
-  csvPreview: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 14px", fontSize: 12, color: "#8a7660", margin: 0, lineHeight: 1.6, fontFamily: "monospace", overflowX: "auto" },
-  uploadBtn: { background: C.surface, border: `1px solid ${C.border}`, color: C.cream, borderRadius: 10, padding: "12px 20px", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", fontFamily: "'DM Sans', sans-serif", alignSelf: "flex-start" },
+  code: { background: C.faint, padding: "1px 6px", borderRadius: 4, fontSize: 11, color: C.accent, fontFamily: "monospace" },
+  csvPreview: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 14px", fontSize: 12, color: C.muted, margin: 0, lineHeight: 1.6, fontFamily: "monospace", overflowX: "auto" },
+  uploadBtn: { background: C.surface, border: `1px solid ${C.border}`, color: C.cream, borderRadius: 10, padding: "12px 20px", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", fontFamily: "'Inter', system-ui, sans-serif", alignSelf: "flex-start" },
   previewBox: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px" },
   previewTitle: { fontSize: 12, color: C.muted, margin: "0 0 10px", textTransform: "uppercase", letterSpacing: "0.06em" },
   previewScroll: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 200, overflowY: "auto" },
@@ -1856,64 +1868,64 @@ const S = {
   previewName: { fontSize: 13, color: C.cream },
   moreText: { fontSize: 12, color: C.muted, margin: "6px 0 0", textAlign: "center" },
   previewBtnRow: { display: "flex", gap: 8, marginTop: 12 },
-  confirmBtn: { background: `linear-gradient(135deg, ${C.gold}, #b8821e)`, border: "none", color: "#0e0c09", borderRadius: 8, padding: "9px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-  cancelBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: "9px 16px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  confirmBtn: { background: C.accent, border: "none", color: "#fff", borderRadius: 8, padding: "9px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
+  cancelBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: "9px 16px", fontSize: 13, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
   suggestBox: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "16px", marginTop: 4 },
-  suggestTitle: { fontSize: 13, color: C.gold, margin: "0 0 10px", fontWeight: 500 },
+  suggestTitle: { fontSize: 13, color: C.accent, margin: "0 0 10px", fontWeight: 500 },
   suggestList: { margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 6 },
   suggestItem: { fontSize: 12, color: C.muted, lineHeight: 1.5 },
   // WEEKLY REPORT
   reportBox: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "16px" },
-  reportTitle: { fontSize: 13, color: C.gold, fontWeight: 500, margin: "0 0 12px" },
+  reportTitle: { fontSize: 13, color: C.accent, fontWeight: 500, margin: "0 0 12px" },
   reportEmpty: { fontSize: 12, color: C.muted, margin: 0, fontStyle: "italic" },
   reportRow: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 14 },
   reportRowTop: { display: "flex", justifyContent: "space-between", alignItems: "baseline" },
   reportWeekLabel: { fontSize: 12, color: C.muted },
-  reportCount: { fontSize: 16, fontFamily: "'Cormorant Garamond', serif", color: C.cream },
+  reportCount: { fontSize: 16, fontFamily: "'Lora', Georgia, serif", color: C.cream },
   reportBar: { height: 6, background: C.faint, borderRadius: 3, overflow: "hidden" },
-  reportBarFill: { height: "100%", background: `linear-gradient(90deg, ${C.gold}, ${C.goldLight})`, borderRadius: 3, transition: "width 0.6s ease" },
+  reportBarFill: { height: "100%", background: `linear-gradient(90deg, ${C.accent}, ${C.accentLight})`, borderRadius: 3, transition: "width 0.6s ease" },
   reportPct: { fontSize: 11, color: C.muted },
   // REMINDERS
   reminderSection: { margin: "16px 20px 0", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 },
   reminderTitle: { fontSize: 12, color: C.muted, fontWeight: 500, margin: 0, textTransform: "uppercase", letterSpacing: "0.06em" },
-  reminderSetupBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 10, padding: "10px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", textAlign: "left" },
-  iosGuide: { background: "#161109", borderRadius: 10, padding: "14px", display: "flex", flexDirection: "column", gap: 10 },
+  reminderSetupBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 10, padding: "10px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif", textAlign: "left" },
+  iosGuide: { background: C.surface, borderRadius: 10, padding: "14px", display: "flex", flexDirection: "column", gap: 10 },
   iosGuideTitle: { fontSize: 12, color: C.cream, margin: 0, fontWeight: 500 },
   iosStep: { display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: C.muted, lineHeight: 1.5 },
-  iosStepNum: { background: C.gold, color: "#0e0c09", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0, marginTop: 1 },
-  iosDismiss: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: "7px 14px", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", alignSelf: "flex-start", marginTop: 4 },
+  iosStepNum: { background: C.accent, color: C.bg, borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0, marginTop: 1 },
+  iosDismiss: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: "7px 14px", fontSize: 12, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif", alignSelf: "flex-start", marginTop: 4 },
   reminderControls: { display: "flex", flexDirection: "column", gap: 10 },
   reminderRow: { display: "flex", alignItems: "center", justifyContent: "space-between" },
   reminderLabel: { fontSize: 13, color: C.muted },
-  timeInput: { background: "#0e0c09", border: `1px solid ${C.border}`, borderRadius: 8, color: C.cream, padding: "6px 10px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", cursor: "pointer" },
-  reminderOnBtn: { background: `linear-gradient(135deg, ${C.gold}, #b8821e)`, border: "none", color: "#0e0c09", borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
-  reminderOffBtn: { background: "none", border: `1px solid ${C.border}`, color: "#8a5050", borderRadius: 10, padding: "9px 0", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  timeInput: { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, color: C.cream, padding: "6px 10px", fontSize: 13, fontFamily: "'Inter', system-ui, sans-serif", outline: "none", cursor: "pointer" },
+  reminderOnBtn: { background: `linear-gradient(135deg, ${C.accent}, #b8821e)`, border: "none", color: C.bg, borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
+  reminderOffBtn: { background: "none", border: `1px solid ${C.border}`, color: "#8a5050", borderRadius: 10, padding: "9px 0", fontSize: 12, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
   // ADMIN FOOTER
   adminFooter: { display: "flex", justifyContent: "center", padding: "12px 0 20px", marginTop: "auto" },
-  adminLink: { background: "none", border: "none", color: "#2e2518", fontSize: 11, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.06em" },
+  adminLink: { background: "none", border: "none", color: C.border, fontSize: 11, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: "0.06em" },
   // MODAL
   modalOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 },
   modalBox: { background: "#1b1610", border: "1px solid #2e2518", borderRadius: 16, padding: "28px 24px", width: "100%", maxWidth: 320, display: "flex", flexDirection: "column", gap: 14 },
-  modalTitle: { fontFamily: "'Cormorant Garamond', serif", fontSize: 22, color: "#e2cfb0", margin: 0, textAlign: "center" },
-  modalInput: { background: "#0e0c09", border: "1px solid #2e2518", borderRadius: 10, color: "#e2cfb0", padding: "12px 14px", fontSize: 16, fontFamily: "'DM Sans', sans-serif", outline: "none", textAlign: "center", letterSpacing: "0.08em" },
+  modalTitle: { fontFamily: "'Lora', Georgia, serif", fontSize: 22, color: "#e2cfb0", margin: 0, textAlign: "center" },
+  modalInput: { background: C.bg, border: "1px solid #2e2518", borderRadius: 10, color: "#e2cfb0", padding: "12px 14px", fontSize: 16, fontFamily: "'Inter', system-ui, sans-serif", outline: "none", textAlign: "center", letterSpacing: "0.08em" },
   modalError: { fontSize: 12, color: "#c07070", margin: 0, textAlign: "center" },
   modalBtns: { display: "flex", gap: 8 },
   // DROPDOWN
   ddWrap: { marginTop: 12, display: "flex", flexDirection: "column" },
-  ddToggle: { background: "#1b1610", border: "1px solid #2e2518", borderRadius: 10, color: "#7d6a52", padding: "10px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", justifyContent: "space-between", alignItems: "center" },
-  ddList: { background: "#161109", border: "1px solid #2e2518", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: 260, overflowY: "auto", display: "flex", flexDirection: "column" },
-  ddItem: { background: "none", border: "none", borderBottom: "1px solid #1e1810", color: "#e2cfb0", padding: "11px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", justifyContent: "space-between", alignItems: "center", textAlign: "left" },
-  ddItemPrayed: { color: "#4a5e44" },
-  ddItemMeta: { fontSize: 11, color: "#3a3020", marginLeft: 8, flexShrink: 0 },
+  ddToggle: { background: "#1b1610", border: "1px solid #2e2518", borderRadius: 10, color: "#7d6a52", padding: "10px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif", display: "flex", justifyContent: "space-between", alignItems: "center" },
+  ddList: { background: C.surface, border: "1px solid #2e2518", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: 260, overflowY: "auto", display: "flex", flexDirection: "column" },
+  ddItem: { background: "none", border: "none", borderBottom: "1px solid #1e1810", color: "#e2cfb0", padding: "11px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif", display: "flex", justifyContent: "space-between", alignItems: "center", textAlign: "left" },
+  ddItemPrayed: { color: C.muted },
+  ddItemMeta: { fontSize: 11, color: C.faint, marginLeft: 8, flexShrink: 0 },
   // TAP TO BEGIN
   tapCard: { cursor: "pointer", alignItems: "center", justifyContent: "center", minHeight: 220, gap: 10, animation: "tapPulse 2s ease-in-out infinite" },
-  tapCross: { fontSize: 28, color: C.gold, marginBottom: 8 },
-  tapTitle: { fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: C.cream, margin: 0, textAlign: "center" },
+  tapCross: { fontSize: 28, color: C.accent, marginBottom: 8 },
+  tapTitle: { fontFamily: "'Lora', Georgia, serif", fontSize: 36, fontWeight: 400, color: C.cream, margin: 0, textAlign: "center" },
   tapSub: { fontSize: 13, color: C.muted, margin: 0, textAlign: "center" },
   // GROUP BADGES
   badgeRow: { display: "flex", gap: 6, marginBottom: 14 },
-  hsBadge: { background: "#162533", color: "#7aafc4", border: "1px solid #7aafc433", marginBottom: 0 },
-  msBadge: { background: "#2a1e0a", color: "#c49a6c", border: "1px solid #c49a6c33", marginBottom: 0 },
-  hsBadgeSm: { background: "#162533", color: "#7aafc4" },
-  msBadgeSm: { background: "#2a1e0a", color: "#c49a6c" },
+  hsBadge: { background: C.studentBg, color: "#7aafc4", border: "1px solid #7aafc433", marginBottom: 0 },
+  msBadge: { background: C.faint, color: "#c49a6c", border: "1px solid #c49a6c33", marginBottom: 0 },
+  hsBadgeSm: { background: C.studentBg, color: "#7aafc4" },
+  msBadgeSm: { background: C.faint, color: "#c49a6c" },
 };
