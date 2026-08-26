@@ -1080,8 +1080,8 @@ export default function App() {
         <div style={S.logoWrap}>
           <svg width="16" height="16" viewBox="0 0 20 20" style={{ flexShrink:0, marginTop:2 }}><path d="M10,2 L11.768,8.232 L18,10 L11.768,11.768 L10,18 L8.232,11.768 L2,10 L8.232,8.232 Z" fill="#6b9e78" /></svg>
           <div style={{ display:"flex", flexDirection:"column", lineHeight:1 }}>
-            <span style={S.logoText}>Calvary Students</span>
-            <span style={S.logoSub}>Let’s Pray</span>
+            <span style={S.logoText}>Let’s Pray</span>
+            <span style={S.logoSub}>Calvary Students</span>
           </div>
         </div>
         <div style={{ ...S.weekBar, cursor: "pointer" }} onClick={() => setView("week")}>
@@ -1750,7 +1750,7 @@ const S = {
   header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 20px 0" },
   logoWrap: { display: "flex", alignItems: "center", gap: 8 },
   logoCross: { fontSize: 18, color: C.accent },
-  logoText: { fontFamily: "'Lora', Georgia, serif", fontSize: 22, fontWeight: 600, color: C.cream, letterSpacing: "0.02em" },
+  logoText: { fontFamily: "'Lora', Georgia, serif", fontSize: 24, fontWeight: 600, color: C.cream, letterSpacing: "0.01em" },
   weekBar: { display: "flex", alignItems: "center", gap: 6, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: "5px 12px" },
   weekText: { fontSize: 12, color: C.muted },
   bdayAlert: { fontSize: 11, background: C.faint, color: C.accent, borderRadius: 10, padding: "2px 7px 2px 6px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 3, verticalAlign: "middle" },
