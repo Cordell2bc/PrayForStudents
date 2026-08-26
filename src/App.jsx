@@ -583,7 +583,7 @@ export default function App() {
   @keyframes flyInRight  { from { transform: translateX(-110%) rotate(-6deg); opacity: 0; } to { transform: none; opacity: 1; } }
   @keyframes confettiFall { 0% { transform: translateY(-20px) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
   @keyframes celebPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
-  @keyframes bdayGlow { 0%,100%{box-shadow:0 0 8px 2px #c9982a66, 0 0 0 0 #c9982a00} 50%{box-shadow:0 0 18px 6px #c9982aaa, 0 0 32px 12px #c9982a33} }
+  @keyframes bdayGlow { 0%,100%{box-shadow:0 0 8px 2px rgba(255,255,255,0.2), 0 0 0 0 rgba(255,255,255,0)} 50%{box-shadow:0 0 18px 6px rgba(255,255,255,0.35), 0 0 32px 12px rgba(255,255,255,0.1)} }
   @keyframes bdaySpin { 0%{transform:rotate(-8deg) scale(1.08)} 50%{transform:rotate(8deg) scale(1.15)} 100%{transform:rotate(-8deg) scale(1.08)} }
 `;
     document.head.appendChild(style);
@@ -740,6 +740,7 @@ export default function App() {
 
   const deck = (() => {
     if (order === "alpha") return getFiltered().filter(p => !withinWeek(p.prayedAt)).slice().sort((a, b) => a.name.localeCompare(b.name));
+    if (order === "oldest") return getFiltered().filter(p => !withinWeek(p.prayedAt)).slice().sort((a, b) => (a.prayedAt || 0) - (b.prayedAt || 0));
     const map = Object.fromEntries(activePeople.map(p => [p.id, p]));
     return deckIds.map(id => map[id]).filter(Boolean);
   })();
@@ -884,10 +885,11 @@ export default function App() {
   }
 
   const [addGrade, setAddGrade] = useState("");
+  const [addBday, setAddBday] = useState("");
 
   function addPerson() {
     if (!addName.trim()) return;
-    setPeople(prev => [...prev, { id: genId(), name: addName.trim(), type: addType, group: addType === "student" ? addGroup : null, grade: addType === "student" && addGrade ? Number(addGrade) : null, active: true, prayedAt: null, prayerRequests: [], birthday: "", updatedAt: Date.now() }]);
+    setPeople(prev => [...prev, { id: genId(), name: addName.trim(), type: addType, group: addType === "student" ? addGroup : null, grade: addType === "student" && addGrade ? Number(addGrade) : null, active: true, prayedAt: null, prayerRequests: [], birthday: addBday.trim() ? formatBirthday(addBday.trim()) : "", updatedAt: Date.now() }]); setAddBday("");
     setAddName("");
     setAddGrade("");
   }
@@ -1076,13 +1078,15 @@ export default function App() {
       {/* Header */}
       <header style={S.header}>
         <div style={S.logoWrap}>
-          <span style={S.logoCross}>✦</span>
-          <span style={S.logoText}>Calvary Students</span>
+          <div style={{ display:"flex", flexDirection:"column", lineHeight:1 }}>
+            <span style={S.logoText}>Calvary Students</span>
+            <span style={S.logoSub}>Let’s Pray</span>
+          </div>
         </div>
         <div style={{ ...S.weekBar, cursor: "pointer" }} onClick={() => setView("week")}>
           <Heart size={13} color={C.accent} fill={C.accent} />
           <span style={S.weekText}>{prayedCount >= activePeople.length ? praySessionCount : prayedCount} / {activePeople.length} this week</span>
-          {urgentBdays > 0 && <span style={{ ...S.bdayAlert, ...(upcomingBdays.some(b => b.diff === 0) ? { animation:"bdayGlow 1.6s ease-in-out infinite" } : {}) }}><span style={{lineHeight:1}}>🎂</span><span style={{lineHeight:1}}>{urgentBdays}</span></span>}
+          {urgentBdays > 0 && <span style={{ ...S.bdayAlert, ...(upcomingBdays.some(b => b.diff === 0) ? { animation:"bdayGlow 1.6s ease-in-out infinite" } : {}) }}><Cake size={12} /><span style={{lineHeight:1}}>{urgentBdays}</span></span>}
         </div>
       </header>
 
@@ -1131,6 +1135,7 @@ export default function App() {
             <div style={S.togglePill}>
               <button onClick={() => { setOrder("random"); buildDeck(); }} style={{ ...S.toggleOpt, ...(order === "random" ? S.toggleOptOn : {}) }}>Shuffle</button>
               <button onClick={() => { setOrder("alpha"); setCardIdx(0); if (shouldShowTap()) setReady(false); }} style={{ ...S.toggleOpt, ...(order === "alpha" ? S.toggleOptOn : {}) }}>A–Z</button>
+              <button onClick={() => { setOrder("oldest"); setCardIdx(0); if (shouldShowTap()) setReady(false); }} style={{ ...S.toggleOpt, ...(order === "oldest" ? S.toggleOptOn : {}) }}>Overdue</button>
             </div>
             <select value={filter} onChange={e => { setFilter(e.target.value); setCardIdx(0); if (shouldShowTap()) setReady(false); }} style={S.filterSelect}>
               <option value="all">Everyone</option>
@@ -1155,7 +1160,7 @@ export default function App() {
                 {todayBdayPrayed.map(({ person }) => (
                   <div key={person.id} style={{ position:"relative", width:"100%", marginBottom:8 }}>
                     <button onClick={() => { dismissBday(person.id); setPinnedPersonId(person.id); setReqFor(null); setReady(true); setPeople(p => [...p]); }} style={S.bdayBanner}>
-                      {"🎂"} Today is {person.name}{"’"}s birthday! Tap to pray.
+                      
                     </button>
                     <button onClick={e => { e.stopPropagation(); dismissBday(person.id); setPeople(p => [...p]); }} style={S.bdayDismiss}>{"✕"}</button>
                   </div>
@@ -1194,7 +1199,7 @@ export default function App() {
                   {todayBdayPrayed.map(({ person }) => (
                     <div key={person.id} style={{ position:"relative", width:"100%", marginBottom:8 }}>
                       <button onClick={() => { dismissBday(person.id); setPinnedPersonId(person.id); setReqFor(null); setPeople(p => [...p]); }} style={S.bdayBanner}>
-                        {"🎂"} Today is {person.name}{"’"}s birthday! Tap to pray.
+                        
                       </button>
                       <button onClick={e => { e.stopPropagation(); dismissBday(person.id); setPeople(p => [...p]); }} style={S.bdayDismiss}>{"✕"}</button>
                     </div>
@@ -1235,7 +1240,7 @@ export default function App() {
                       <h2 style={S.cardName}>{current?.name}</h2>
 
                       {bdayStatus && (
-                        <div style={{ ...S.bdayChip, ...(bdayStatus.urgent ? S.bdayChipUrgent : {}), ...(bdayStatus.today ? { animation: "bdayGlow 1.6s ease-in-out infinite", fontSize: 13, padding: "6px 14px" } : {}) }}>{bdayStatus.today ? <span style={{ display:"inline-block", animation:"bdaySpin 2s ease-in-out infinite", marginRight:6 }}>🎂</span> : null}{bdayStatus.label.replace("🎂 ", "")}</div>
+                        <div style={{ ...S.bdayChip, ...(bdayStatus.urgent ? S.bdayChipUrgent : {}), ...(bdayStatus.today && !isBdayDismissed(current?.id) ? { animation: "bdayGlow 1.6s ease-in-out infinite", fontSize: 13, padding: "6px 14px" } : {}) }}><Cake size={13} style={{ marginRight:5, flexShrink:0, ...(bdayStatus.today ? { animation:"bdaySpin 2s ease-in-out infinite" } : {}) }} />{bdayStatus.label.replace("🎂 ", "")}</div>
                       )}
                       {current?.birthday && !bdayStatus && (
                         <div style={S.bdayQuiet}><Cake size={11} style={{ marginRight: 5, opacity: 0.5 }} />{formatBirthday(current.birthday)}</div>
@@ -1425,11 +1430,14 @@ export default function App() {
               <option value="ms">MS</option>
             </select>
             {addType === "student" && (
-              <select value={addGrade} onChange={e => setAddGrade(e.target.value)} style={{ ...S.addTypeSelect, flex: 1 }}>
+              <select value={addGrade} onChange={e => { const g = e.target.value; setAddGrade(g); if (g && addType === 'student') setAddGroup(Number(g) >= 9 ? 'hs' : 'ms'); }} style={{ ...S.addTypeSelect, flex: 1 }}>
                 <option value="">Grade</option>
                 {[5,6,7,8,9,10,11,12].map(g => <option key={g} value={g}>{`Grade ${g}`}</option>)}
               </select>
             )}
+          </div>
+          <div style={S.addRow}>
+            <input value={addBday} onChange={e => setAddBday(e.target.value)} placeholder="Birthday MM-DD (optional)" style={{ ...S.addInput, flex: 1, fontSize: 13 }} />
             <button onClick={addPerson} style={S.addPersonBtn}><Plus size={16} /></button>
           </div>
 
@@ -1633,14 +1641,7 @@ export default function App() {
             </div>
           )}
 
-          <div style={S.suggestBox}>
-            <div style={{ display:"flex", alignItems:"center", gap:8 }}><Lightbulb size={14} color={C.accent} /><p style={S.suggestTitle}>Still on the roadmap</p></div>
-            <ul style={S.suggestList}>
-              {["Prayer streak — consecutive weeks praying for everyone", "Prayer history log — timestamped journal per person", "Groups — organize by small group, grade, or team", "Notes field — free-form notes per person", "Completed requests — mark a request answered and archive it"].map((s, i) => (
-                <li key={i} style={S.suggestItem}>{s}</li>
-              ))}
-            </ul>
-          </div>
+
         </div>
       )}
       {/* Reminders section */}
@@ -1762,7 +1763,7 @@ const S = {
   emptySub: { fontSize: 13, color: C.faint, margin: 0, textAlign: "center" },
   cardOuter: { position: "relative", margin: "0 0 20px", touchAction: "pan-y" },
   cardGhost: { position: "absolute", inset: 0, background: "#242729", borderRadius: 16, border: `1px solid ${C.border}`, boxShadow: "0 4px 16px rgba(0,0,0,0.4)" },
-  card: { position: "relative", background: `linear-gradient(160deg, #2e3235 0%, ${C.card} 100%)`, border: `1px solid ${C.border}`, borderTop: "1px solid #3a3f43", borderRadius: 16, padding: "28px 24px 22px", display: "flex", flexDirection: "column", gap: 0, boxShadow: "0 2px 0 rgba(255,255,255,0.03) inset, 0 12px 48px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4)", userSelect: "none" },
+  card: { position: "relative", background: `repeating-linear-gradient(${C.card}, ${C.card} 27px, #2e3235 27px, #2e3235 28px)`, backgroundPositionY: "52px", border: `1px solid ${C.border}`, borderTop: "1px solid #3a3f43", borderRadius: 16, padding: "28px 24px 22px", display: "flex", flexDirection: "column", gap: 0, boxShadow: "0 2px 0 rgba(255,255,255,0.03) inset, 0 12px 48px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4)", userSelect: "none" },
   cardDone: { background: "#1d2620", borderColor: "#3a5040", borderTop: "1px solid #4a6050" },
   badge: { display: "inline-flex", alignSelf: "flex-start", padding: "3px 11px", borderRadius: 12, fontSize: 11, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 14 },
   studentBadge: { background: C.studentBg, color: C.student, border: `1px solid ${C.student}33` },
@@ -1870,10 +1871,6 @@ const S = {
   previewBtnRow: { display: "flex", gap: 8, marginTop: 12 },
   confirmBtn: { background: C.accent, border: "none", color: "#fff", borderRadius: 8, padding: "9px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
   cancelBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: "9px 16px", fontSize: 13, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
-  suggestBox: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "16px", marginTop: 4 },
-  suggestTitle: { fontSize: 13, color: C.accent, margin: "0 0 10px", fontWeight: 500 },
-  suggestList: { margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 6 },
-  suggestItem: { fontSize: 12, color: C.muted, lineHeight: 1.5 },
   // WEEKLY REPORT
   reportBox: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "16px" },
   reportTitle: { fontSize: 13, color: C.accent, fontWeight: 500, margin: "0 0 12px" },
@@ -1898,23 +1895,23 @@ const S = {
   reminderRow: { display: "flex", alignItems: "center", justifyContent: "space-between" },
   reminderLabel: { fontSize: 13, color: C.muted },
   timeInput: { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, color: C.cream, padding: "6px 10px", fontSize: 13, fontFamily: "'Inter', system-ui, sans-serif", outline: "none", cursor: "pointer" },
-  reminderOnBtn: { background: `linear-gradient(135deg, ${C.accent}, #b8821e)`, border: "none", color: C.bg, borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
+  reminderOnBtn: { background: C.accent, border: "none", color: "#fff", borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" }, #b8821e)`, border: "none", color: C.bg, borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
   reminderOffBtn: { background: "none", border: `1px solid ${C.border}`, color: "#8a5050", borderRadius: 10, padding: "9px 0", fontSize: 12, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
   // ADMIN FOOTER
   adminFooter: { display: "flex", justifyContent: "center", padding: "12px 0 20px", marginTop: "auto" },
   adminLink: { background: "none", border: "none", color: C.border, fontSize: 11, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: "0.06em" },
   // MODAL
   modalOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 },
-  modalBox: { background: "#1b1610", border: "1px solid #2e2518", borderRadius: 16, padding: "28px 24px", width: "100%", maxWidth: 320, display: "flex", flexDirection: "column", gap: 14 },
+  modalBox: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: "28px 24px", width: "100%", maxWidth: 320, display: "flex", flexDirection: "column", gap: 14 },
   modalTitle: { fontFamily: "'Lora', Georgia, serif", fontSize: 22, color: "#e2cfb0", margin: 0, textAlign: "center" },
   modalInput: { background: C.bg, border: "1px solid #2e2518", borderRadius: 10, color: "#e2cfb0", padding: "12px 14px", fontSize: 16, fontFamily: "'Inter', system-ui, sans-serif", outline: "none", textAlign: "center", letterSpacing: "0.08em" },
   modalError: { fontSize: 12, color: "#c07070", margin: 0, textAlign: "center" },
   modalBtns: { display: "flex", gap: 8 },
   // DROPDOWN
   ddWrap: { marginTop: 12, display: "flex", flexDirection: "column" },
-  ddToggle: { background: "#1b1610", border: "1px solid #2e2518", borderRadius: 10, color: "#7d6a52", padding: "10px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif", display: "flex", justifyContent: "space-between", alignItems: "center" },
-  ddList: { background: C.surface, border: "1px solid #2e2518", borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: 260, overflowY: "auto", display: "flex", flexDirection: "column" },
-  ddItem: { background: "none", border: "none", borderBottom: "1px solid #1e1810", color: "#e2cfb0", padding: "11px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif", display: "flex", justifyContent: "space-between", alignItems: "center", textAlign: "left" },
+  ddToggle: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, color: C.muted, padding: "10px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif", display: "flex", justifyContent: "space-between", alignItems: "center" },
+  ddList: { background: C.surface, border: `1px solid ${C.border}`, borderTop: "none", borderRadius: "0 0 10px 10px", maxHeight: 260, overflowY: "auto", display: "flex", flexDirection: "column" },
+  ddItem: { background: "none", border: "none", borderBottom: `1px solid ${C.faint}`, color: C.cream, padding: "11px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif", display: "flex", justifyContent: "space-between", alignItems: "center", textAlign: "left" },
   ddItemPrayed: { color: C.muted },
   ddItemMeta: { fontSize: 11, color: C.faint, marginLeft: 8, flexShrink: 0 },
   // TAP TO BEGIN
