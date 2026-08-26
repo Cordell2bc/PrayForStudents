@@ -1591,7 +1591,6 @@ export default function App() {
                   </div>
                 </div>
               ))}
-            </div>
             <div style={{ display:"flex", justifyContent:"flex-end", marginTop:8 }}>
               {!confirmClearInactive ? (
                 <button onClick={() => setConfirmClearInactive(true)} style={{ background:"none", border:"none", color:"#8a5050", fontSize:12, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif" }}>
@@ -1604,6 +1603,7 @@ export default function App() {
                   <button onClick={() => setConfirmClearInactive(false)} style={S.cancelBtn}>Cancel</button>
                 </div>
               )}
+            </div>
             </div>
           )}
         </div>
