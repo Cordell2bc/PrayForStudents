@@ -1340,6 +1340,7 @@ export default function App() {
                           <img
                             src={current.photoUrl}
                             alt={current.name}
+                            onClick={() => { setLightboxUrl(current.photoUrl); setLightboxName(current.name); }}
                             style={{
                               width: 88,
                               height: 66,
@@ -1351,6 +1352,7 @@ export default function App() {
                               border: "3px solid #f0ebe4",
                               position: "relative",
                               zIndex: 1,
+                              cursor: "pointer",
                             }}
                           />
                         </div>
