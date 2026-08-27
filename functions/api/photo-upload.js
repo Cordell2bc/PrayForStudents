@@ -35,7 +35,7 @@ export async function onRequest(context) {
     });
 
     // Return the public URL — requires public access enabled on the bucket
-    const publicUrl = `${env.R2_PUBLIC_URL}/${key}`;
+    const publicUrl = `${env.R2_PUBLIC_URL.replace(/\/+$/, "")}/${key}`;
     return new Response(JSON.stringify({ ok: true, url: publicUrl }), {
       headers: { ...headers, "Content-Type": "application/json" }
     });
