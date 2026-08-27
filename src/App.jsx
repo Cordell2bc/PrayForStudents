@@ -951,13 +951,14 @@ export default function App() {
       const res = await fetch("/api/photo-upload", { method: "POST", body: form });
       const data = await res.json();
       if (data.url) {
-        // Store URL + cache-bust timestamp on the person record
         setPeople(prev => prev.map(p => p.id === personId
           ? { ...p, photoUrl: data.url + "?t=" + Date.now(), updatedAt: Date.now() }
           : p
         ));
+      } else {
+        alert("Upload error: " + JSON.stringify(data));
       }
-    } catch (_e) {}
+    } catch (e) { alert("Upload failed: " + e.message); }
     setUploadingPhotoFor(null);
   }
 
