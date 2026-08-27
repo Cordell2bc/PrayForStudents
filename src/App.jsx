@@ -1781,6 +1781,7 @@ export default function App() {
         </div>
       )}
       {/* Reminders section */}
+      {view === "pray" && (
       <div style={S.reminderSection}>
         {/* Header row — always visible, tappable to expand/collapse */}
         <button onClick={() => setReminderExpanded(e => { const next = !e; try { localStorage.setItem("intercede-reminder-expanded", String(next)); } catch (_e) {} return next; })} style={{ background:"none", border:"none", padding:0, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"space-between", width:"100%" }}>
@@ -1846,6 +1847,7 @@ export default function App() {
           )}
         </>)}
       </div>
+      )}
 
       {/* Admin footer link */}
       <div style={S.adminFooter}>
@@ -1908,9 +1910,9 @@ const S = {
   emptyTitle: { fontFamily: "'Lora', Georgia, serif", fontSize: 22, color: C.muted, margin: 0 },
   emptySub: { fontSize: 13, color: C.faint, margin: 0, textAlign: "center" },
   cardOuter: { position: "relative", margin: "0 0 20px", touchAction: "pan-y" },
-  cardGhost: { position: "absolute", inset: 0, background: "#242729", borderRadius: 16, border: `1px solid ${C.border}`, boxShadow: "0 4px 16px rgba(0,0,0,0.4)" },
-  card: { position: "relative", background: `repeating-linear-gradient(${C.card}, ${C.card} 27px, #2e3235 27px, #2e3235 28px)`, backgroundPositionY: "52px", border: `1px solid ${C.border}`, borderTop: `1px solid ${C.accent}44`, borderRadius: 16, padding: "28px 24px 22px", display: "flex", flexDirection: "column", gap: 0, boxShadow: `0 2px 0 ${C.accent}18 inset, 0 12px 48px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4)`, userSelect: "none" },
-  cardDone: { background: "#1d2620", borderColor: "#3a5040", borderTop: "1px solid #4a6050" },
+  cardGhost: { position: "absolute", inset: 0, background: "#242729", borderRadius: 16, boxShadow: "0 4px 16px rgba(0,0,0,0.4)" },
+  card: { position: "relative", backgroundColor: C.card, background: `repeating-linear-gradient(${C.card}, ${C.card} 27px, #2e3235 27px, #2e3235 28px)`, backgroundPositionY: "52px", border: "1px solid rgba(255,255,255,0.06)", borderTop: `1px solid ${C.accent}33`, borderRadius: 16, padding: "28px 24px 22px", display: "flex", flexDirection: "column", gap: 0, boxShadow: `0 2px 0 ${C.accent}18 inset, 0 12px 48px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4)`, userSelect: "none", willChange: "transform" },
+  cardDone: { background: "#1d2620", border: "1px solid rgba(107,158,120,0.2)", borderTop: "1px solid rgba(107,158,120,0.35)" },
   badge: { display: "inline-flex", alignSelf: "flex-start", padding: "3px 11px", borderRadius: 12, fontSize: 11, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 14 },
   studentBadge: { background: C.studentBg, color: C.student, border: `1px solid ${C.student}33` },
   leaderBadge: { background: C.leaderBg, color: C.leader, border: `1px solid ${C.leader}33` },
