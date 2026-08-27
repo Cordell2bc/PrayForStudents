@@ -915,6 +915,8 @@ export default function App() {
   const [addGrade, setAddGrade] = useState("");
   const [addBday, setAddBday] = useState("");
   const [uploadingPhotoFor, setUploadingPhotoFor] = useState(null);
+  const [lightboxUrl, setLightboxUrl] = useState(null);
+  const [lightboxName, setLightboxName] = useState(null);
   const [peopleSort, setPeopleSort] = useState("name");
   const [rosterGroup, setRosterGroup] = useState("ms"); // ms | hs | leader
   const [rosterSort, setRosterSort] = useState("name"); // name | grade | birthday
@@ -1771,7 +1773,12 @@ export default function App() {
                     <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
                       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                       {p.photoUrl && (
-                        <img src={p.photoUrl} alt={p.name} style={{ width:36, height:36, objectFit:"cover", borderRadius:3, border:"2px solid #f0ebe4", boxShadow:"0 1px 4px rgba(0,0,0,0.4)", transform:`rotate(${photoRotation(p.id)}deg)`, flexShrink:0 }} />
+                        <img
+                          src={p.photoUrl}
+                          alt={p.name}
+                          onClick={e => { e.stopPropagation(); setLightboxUrl(p.photoUrl); setLightboxName(p.name); }}
+                          style={{ width:36, height:36, objectFit:"cover", borderRadius:3, border:"2px solid #f0ebe4", boxShadow:"0 1px 4px rgba(0,0,0,0.4)", transform:`rotate(${photoRotation(p.id)}deg)`, flexShrink:0, cursor:"pointer" }}
+                        />
                       )}
                       <span style={{ fontSize:15, color:C.cream, fontFamily:"'Lora', Georgia, serif" }}>{p.name}</span>
                     </div>
@@ -1964,6 +1971,26 @@ export default function App() {
           )}
         </>)}
       </div>
+      )}
+
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div
+          onClick={() => setLightboxUrl(null)}
+          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:100, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:16, padding:24, backdropFilter:"blur(6px)" }}
+        >
+          <div style={{ position:"relative", display:"inline-block" }} onClick={e => e.stopPropagation()}>
+            {/* Tape */}
+            <div style={{ position:"absolute", top:-10, left:"50%", transform:"translateX(-50%)", width:72, height:16, background:"rgba(255,255,255,0.55)", borderRadius:2, zIndex:2, boxShadow:"0 1px 4px rgba(0,0,0,0.2)" }} />
+            <img
+              src={lightboxUrl.split("?")[0]}
+              alt={lightboxName}
+              style={{ display:"block", maxWidth:"min(600px, calc(100vw - 48px))", maxHeight:"70vh", objectFit:"contain", border:"4px solid #f0ebe4", borderRadius:2, boxShadow:"0 8px 40px rgba(0,0,0,0.8)", position:"relative", zIndex:1 }}
+            />
+          </div>
+          <p style={{ color:"rgba(255,255,255,0.7)", fontSize:16, fontFamily:"'Lora', Georgia, serif", margin:0 }}>{lightboxName}</p>
+          <p style={{ color:"rgba(255,255,255,0.35)", fontSize:12, margin:0, fontFamily:"'Inter', system-ui, sans-serif" }}>Tap anywhere to close</p>
+        </div>
       )}
 
       {/* Admin footer link */}
