@@ -1771,32 +1771,31 @@ export default function App() {
               .map(p => {
                 const bdayFmt = p.birthday ? (() => { const [m, d] = p.birthday.split("-"); const date = new Date(2000, parseInt(m)-1, parseInt(d)); return date.toLocaleDateString("en-US", { month:"short", day:"numeric" }); })() : null;
                 return (
-                  <div key={p.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"11px 14px", background:C.surface, borderRadius:8, gap:8 }}>
-                    <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
-                      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                      {p.photoUrl && (
-                        <img
-                          src={p.photoUrl}
-                          alt={p.name}
-                          onClick={e => { e.stopPropagation(); setLightboxUrl(p.photoUrl); setLightboxName(p.name); }}
-                          style={{ width:36, height:36, objectFit:"cover", borderRadius:3, border:"2px solid #f0ebe4", boxShadow:"0 1px 4px rgba(0,0,0,0.4)", transform:`rotate(${photoRotation(p.id)}deg)`, flexShrink:0, cursor:"pointer" }}
-                        />
-                      )}
+                  <div key={p.id} style={{ display:"flex", alignItems:"center", padding:"11px 14px", background:C.surface, borderRadius:8, gap:12 }}>
+                    {/* Photo */}
+                    {p.photoUrl && (
+                      <img
+                        src={p.photoUrl}
+                        alt={p.name}
+                        onClick={e => { e.stopPropagation(); setLightboxUrl(p.photoUrl); setLightboxName(p.name); }}
+                        style={{ width:52, height:52, objectFit:"cover", borderRadius:3, border:"2px solid #f0ebe4", boxShadow:"0 2px 6px rgba(0,0,0,0.5)", transform:`rotate(${photoRotation(p.id)}deg)`, flexShrink:0, cursor:"pointer" }}
+                      />
+                    )}
+                    {/* Text — left aligned below name */}
+                    <div style={{ display:"flex", flexDirection:"column", gap:3, flex:1, minWidth:0 }}>
                       <span style={{ fontSize:15, color:C.cream, fontFamily:"'Lora', Georgia, serif" }}>{p.name}</span>
-                    </div>
-                      <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                      <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
                         {p.type === "student" && p.grade && (
-                          <span style={{ fontSize:13, color:C.muted }}>{ordinal(p.grade)} Grade</span>
+                          <span style={{ fontSize:13, color:C.muted, fontWeight:600 }}>{ordinal(p.grade)} Grade</span>
                         )}
                         {p.type === "leader" && p.group && (
-                          <span style={{ fontSize:13, color:C.muted }}>{p.group.toUpperCase()}</span>
+                          <span style={{ fontSize:13, color:C.muted, fontWeight:600 }}>{p.group.toUpperCase()}</span>
                         )}
                         {bdayFmt && <span style={{ fontSize:13, color:C.muted, display:"flex", alignItems:"center", gap:3 }}><Cake size={12} />{bdayFmt}</span>}
                       </div>
                     </div>
-                    <div style={{ display:"flex", gap:4 }}>
-                      {p.group && <span style={{ fontSize:10, fontWeight:600, color: p.group === "hs" ? "#7aafc4" : C.accent, background: p.group === "hs" ? C.studentBg : C.accentBg, borderRadius:6, padding:"2px 7px" }}>{p.group.toUpperCase()}</span>}
-                    </div>
+                    {/* Group badge */}
+                    {p.group && <span style={{ fontSize:10, fontWeight:600, color: p.group === "hs" ? "#7aafc4" : C.accent, background: p.group === "hs" ? C.studentBg : C.accentBg, borderRadius:6, padding:"2px 7px", flexShrink:0 }}>{p.group.toUpperCase()}</span>}
                   </div>
                 );
               })
