@@ -649,7 +649,7 @@ export default function App() {
           );
           const total = data.filter(p => p.active !== false).length;
           const newEntry = { weekStart: currentWeekStart, prevWeekStart, prevWeekDateStr, count: prevWeekCount, total };
-          const updated = [newEntry, ...history].slice(0, 3);
+          const updated = [newEntry, ...history].slice(0, 52);
           setWeekHistory(updated);
           await apiSaveHistory(updated);
         } else {
@@ -780,6 +780,17 @@ export default function App() {
   const pinnedPerson = pinnedPersonId ? activePeople.find(p => p.id === pinnedPersonId) ?? null : null;
   const current = pinnedPerson ?? deck[cardIdx] ?? null;
   const prayedPeople = activePeople.filter(p => withinWeek(p.prayedAt));
+
+  // Streak: consecutive weeks where count >= total (everyone prayed for)
+  const streak = React.useMemo(() => {
+    if (!weekHistory.length) return 0;
+    let count = 0;
+    for (const w of weekHistory) {
+      if (w.total > 0 && w.count >= w.total) count++;
+      else break;
+    }
+    return count;
+  }, [weekHistory]);
   const prayedCount = prayedPeople.length; // unique people prayed
   const praySessionCount = prayedPeople.reduce((sum, p) => sum + (p.weekPrayCount || 1), 0); // total sessions this week
   const upcomingBdays = getUpcomingBirthdays(activePeople);
@@ -1497,6 +1508,24 @@ export default function App() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {streak > 0 && (
+            <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 16px", background:C.accentBg, border:`1px solid ${C.accent}44`, borderRadius:12 }}>
+              <svg width="18" height="18" viewBox="0 0 20 20" style={{ flexShrink:0 }}><path d="M10,2 L11.768,8.232 L18,10 L11.768,11.768 L10,18 L8.232,11.768 L2,10 L8.232,8.232 Z" fill="#6b9e78" /></svg>
+              <span style={{ fontSize:14, color:C.cream, fontFamily:"'Lora', Georgia, serif", lineHeight:1.3 }}>
+                {streak} week{streak !== 1 ? "s" : ""} in a row — everyone prayed for
+              </span>
+            </div>
+          )}
+
+          {streak > 0 && (
+            <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 16px", background:C.accentBg, border:`1px solid ${C.accent}44`, borderRadius:12 }}>
+              <svg width="18" height="18" viewBox="0 0 20 20" style={{ flexShrink:0 }}><path d="M10,2 L11.768,8.232 L18,10 L11.768,11.768 L10,18 L8.232,11.768 L2,10 L8.232,8.232 Z" fill="#6b9e78" /></svg>
+              <span style={{ fontSize:14, color:C.cream, fontFamily:"'Lora', Georgia, serif", lineHeight:1.3 }}>
+                {streak} week{streak !== 1 ? "s" : ""} in a row — everyone prayed for
+              </span>
             </div>
           )}
 
