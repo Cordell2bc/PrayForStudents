@@ -472,8 +472,8 @@ function AllPrayedScreen({ prayedCount, praySessionCount, total, onWeek, onKeepP
       {/* Confetti is its own isolated component — never rerenders from countdown ticks */}
       {show && <Confetti />}
       <div style={{ animation:"celebPulse 2s ease-in-out infinite", lineHeight:1 }}>
-        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M9 5.5C9 4.12 10.12 3 11.5 3C12.88 3 14 4.12 14 5.5V11M9 5.5V11M9 5.5C9 4.12 7.88 3 6.5 3C5.12 3 4 4.12 4 5.5V14C4 17.31 6.69 20 10 20H14C17.31 20 20 17.31 20 14V11C20 9.9 19.1 9 18 9C16.9 9 16 9.9 16 11M14 5.5C14 4.12 15.12 3 16.5 3C17.88 3 19 4.12 19 5.5V11M9 11V14M11.5 11V15M14 11V14" stroke="#6b9e78" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        <svg width="64" height="64" viewBox="0 0 20 20">
+          <path d="M10,2 L11.768,8.232 L18,10 L11.768,11.768 L10,18 L8.232,11.768 L2,10 L8.232,8.232 Z" fill="#6b9e78" />
         </svg>
       </div>
       <h2 style={{ fontFamily:"'Lora', Georgia, serif", fontSize:34, fontWeight:400, color:"#e8e0d4", margin:0, lineHeight:1.2 }}>
