@@ -918,7 +918,7 @@ export default function App() {
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [lightboxName, setLightboxName] = useState(null);
   const [peopleSort, setPeopleSort] = useState("name");
-  const [rosterGroup, setRosterGroup] = useState("ms"); // ms | hs | leader
+  const [rosterGroup, setRosterGroup] = useState("all"); // all | ms | hs | leader
   const [rosterSort, setRosterSort] = useState("name"); // name | grade | birthday
 
   function addPerson() {
@@ -1733,7 +1733,7 @@ export default function App() {
         <div style={S.importWrap}>
           {/* Group filter */}
           <div style={{ display:"flex", gap:0, marginBottom:12, borderRadius:10, overflow:"hidden", border:`1px solid ${C.border}` }}>
-            {[["ms","MS"],["hs","HS"],["leader","Leaders"]].map(([val, label]) => (
+            {[["all","All"],["ms","MS"],["hs","HS"],["leader","Leaders"]].map(([val, label]) => (
               <button key={val} onClick={() => setRosterGroup(val)} style={{ flex:1, background: rosterGroup === val ? C.accent : C.surface, border:"none", color: rosterGroup === val ? "#fff" : C.muted, padding:"9px 0", fontSize:13, fontWeight: rosterGroup === val ? 600 : 400, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif", transition:"background 0.15s" }}>
                 {label}
               </button>
@@ -1752,7 +1752,7 @@ export default function App() {
           {/* People list */}
           <div style={{ display:"flex", flexDirection:"column", gap:1 }}>
             {activePeople
-              .filter(p => rosterGroup === "leader" ? p.type === "leader" : p.group === rosterGroup)
+              .filter(p => rosterGroup === "all" ? true : rosterGroup === "leader" ? p.type === "leader" : p.group === rosterGroup)
               .slice().sort((a, b) => {
                 if (rosterSort === "grade") {
                   const ga = Number(a.grade) || 99;
@@ -1808,7 +1808,7 @@ export default function App() {
                 );
               })
             }
-            {activePeople.filter(p => rosterGroup === "leader" ? p.type === "leader" : p.group === rosterGroup).length === 0 && (
+            {activePeople.filter(p => rosterGroup === "all" ? true : rosterGroup === "leader" ? p.type === "leader" : p.group === rosterGroup).length === 0 && (
               <p style={{ textAlign:"center", color:C.muted, fontSize:13, padding:"32px 0" }}>No one in this group yet.</p>
             )}
           </div>
