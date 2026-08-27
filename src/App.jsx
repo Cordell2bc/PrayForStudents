@@ -1760,11 +1760,19 @@ export default function App() {
                   return ga !== gb ? ga - gb : a.name.localeCompare(b.name);
                 }
                 if (rosterSort === "birthday") {
-                  const ma = a.birthday ? parseInt(a.birthday.split("-")[0] || "99") : 99;
-                  const da = a.birthday ? parseInt(a.birthday.split("-")[1] || "99") : 99;
-                  const mb = b.birthday ? parseInt(b.birthday.split("-")[0] || "99") : 99;
-                  const db = b.birthday ? parseInt(b.birthday.split("-")[1] || "99") : 99;
-                  return ma !== mb ? ma - mb : da !== db ? da - db : a.name.localeCompare(b.name);
+                  // Sort by days until next birthday (soonest first, just-passed at end)
+                  const daysUntil = (bday) => {
+                    if (!bday) return 9999;
+                    const [m, d] = bday.split("-").map(Number);
+                    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+                    const thisYear = new Date(now.getFullYear(), m - 1, d);
+                    let diff = Math.ceil((thisYear - now) / 86400000);
+                    if (diff < 0) diff += 365; // already passed this year — push to end
+                    return diff;
+                  };
+                  const da = daysUntil(a.birthday);
+                  const db = daysUntil(b.birthday);
+                  return da !== db ? da - db : a.name.localeCompare(b.name);
                 }
                 return a.name.localeCompare(b.name);
               })
