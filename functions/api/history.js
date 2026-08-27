@@ -9,14 +9,10 @@ export async function onRequest(context) {
     "Cache-Control": "no-store, no-cache, must-revalidate",
   };
 
-  if (request.method === "OPTIONS") {
-    return new Response(null, { headers });
-  }
+  if (request.method === "OPTIONS") return new Response(null, { headers });
 
   if (!env.INTERCEDE_KV) {
-    return new Response(JSON.stringify({ error: "KV namespace not bound" }), {
-      status: 500, headers,
-    });
+    return new Response(JSON.stringify({ error: "KV namespace not bound" }), { status: 500, headers });
   }
 
   if (request.method === "GET") {
@@ -27,17 +23,16 @@ export async function onRequest(context) {
   if (request.method === "POST") {
     const body = await request.text();
     try {
-      JSON.parse(body);
-      await env.INTERCEDE_KV.put("week_history", body);
+      const parsed = JSON.parse(body);
+      if (!Array.isArray(parsed)) throw new Error("not array");
+      // Store up to 52 weeks for streak tracking
+      const trimmed = parsed.slice(0, 52);
+      await env.INTERCEDE_KV.put("week_history", JSON.stringify(trimmed));
       return new Response(JSON.stringify({ ok: true }), { headers });
-    } catch {
-      return new Response(JSON.stringify({ error: "Invalid JSON" }), {
-        status: 400, headers,
-      });
+    } catch (_e) {
+      return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400, headers });
     }
   }
 
-  return new Response(JSON.stringify({ error: "Method not allowed" }), {
-    status: 405, headers,
-  });
+  return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers });
 }
