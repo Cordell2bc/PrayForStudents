@@ -1319,7 +1319,7 @@ export default function App() {
                       {current?.photoUrl && (
                         <div style={{
                           position: "absolute",
-                          bottom: 90,
+                          bottom: 72,
                           right: 20,
                           zIndex: 3,
                           display: "inline-block",
