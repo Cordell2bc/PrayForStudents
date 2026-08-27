@@ -1313,22 +1313,23 @@ export default function App() {
                         )}
                       </div>
 
-                      {/* Photo — taped to card */}
+                      {/* Photo — taped to bottom-right corner, absolutely positioned */}
                       {current?.photoUrl && (
                         <div style={{
-                          alignSelf: "center",
-                          marginBottom: 12,
-                          position: "relative",
+                          position: "absolute",
+                          bottom: 90,
+                          right: 20,
+                          zIndex: 3,
                           display: "inline-block",
                         }}>
                           {/* Tape strip */}
                           <div style={{
                             position: "absolute",
-                            top: -8,
+                            top: -7,
                             left: "50%",
                             transform: "translateX(-50%)",
-                            width: 48,
-                            height: 14,
+                            width: 42,
+                            height: 12,
                             background: "rgba(255,255,255,0.55)",
                             borderRadius: 2,
                             zIndex: 2,
@@ -1338,8 +1339,8 @@ export default function App() {
                             src={current.photoUrl}
                             alt={current.name}
                             style={{
-                              width: 120,
-                              height: 90,
+                              width: 88,
+                              height: 66,
                               objectFit: "cover",
                               display: "block",
                               borderRadius: 2,
