@@ -1752,7 +1752,7 @@ export default function App() {
           {/* People list */}
           <div style={{ display:"flex", flexDirection:"column", gap:1 }}>
             {activePeople
-              .filter(p => rosterGroup === "all" ? true : rosterGroup === "leader" ? p.type === "leader" : p.group === rosterGroup)
+              .filter(p => rosterGroup === "all" ? true : rosterGroup === "leader" ? p.type === "leader" : p.group === rosterGroup && p.type === "student")
               .slice().sort((a, b) => {
                 if (rosterSort === "grade") {
                   const ga = Number(a.grade) || 99;
@@ -1808,7 +1808,7 @@ export default function App() {
                 );
               })
             }
-            {activePeople.filter(p => rosterGroup === "all" ? true : rosterGroup === "leader" ? p.type === "leader" : p.group === rosterGroup).length === 0 && (
+            {activePeople.filter(p => rosterGroup === "all" ? true : rosterGroup === "leader" ? p.type === "leader" : p.group === rosterGroup && p.type === "student").length === 0 && (
               <p style={{ textAlign:"center", color:C.muted, fontSize:13, padding:"32px 0" }}>No one in this group yet.</p>
             )}
           </div>
