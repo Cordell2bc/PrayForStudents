@@ -992,11 +992,22 @@ export default function App() {
   }
 
   function clearAllInactive() {
-    setPeople(prev => prev.filter(p => p.active !== false));
+    setPeople(prev => {
+      const filtered = prev.filter(p => p.active !== false);
+      // Save immediately — don't wait for debounce
+      apiSave(filtered).catch(() => {});
+      return filtered;
+    });
     setConfirmClearInactive(false);
   }
 
-  function deletePerm(id) { setPeople(prev => prev.filter(p => p.id !== id)); }
+  function deletePerm(id) {
+    setPeople(prev => {
+      const filtered = prev.filter(p => p.id !== id);
+      apiSave(filtered).catch(() => {});
+      return filtered;
+    });
+  }
 
   function saveBirthday(id, val) {
     setPeople(prev => prev.map(p => p.id === id ? { ...p, birthday: val, updatedAt: Date.now() } : p));
