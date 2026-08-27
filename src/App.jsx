@@ -390,7 +390,7 @@ function Confetti() {
     delay: Math.random() * 2.5,
     duration: 2.8 + Math.random() * 2,
     size: 7 + Math.random() * 8,
-    color: ["#c9982a","#e8b84b","#8fc47f","#4e84a0","#c49a6c","#e2cfb0","#72966a"][i % 7],
+    color: ["#6b9e78","#8eba95","#5b8fa8","#7a8082","#4a7a60","#8eba95","#5b8fa8"][i % 7],
     rotate: Math.random() * 360,
   }));
   return (
@@ -427,7 +427,7 @@ function CountdownTicker({ targetTs }) {
   const s = totalSecs % 60;
   const pad = n => String(n).padStart(2, "0");
   const label = d > 0 ? `${d}d ${pad(h)}h ${pad(m)}m ${pad(s)}s` : `${pad(h)}h ${pad(m)}m ${pad(s)}s`;
-  return <p style={{ fontSize:13, color:"#7d6a52", margin:0, fontVariantNumeric:"tabular-nums" }}>{label}</p>;
+  return <p style={{ fontSize:13, color:"#7a8082", margin:0, fontVariantNumeric:"tabular-nums" }}>{label}</p>;
 }
 
 function useCountdown(targetTs) {
@@ -471,27 +471,31 @@ function AllPrayedScreen({ prayedCount, praySessionCount, total, onWeek, onKeepP
     <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"0 24px 40px", gap:20, textAlign:"center" }}>
       {/* Confetti is its own isolated component — never rerenders from countdown ticks */}
       {show && <Confetti />}
-      <div style={{ fontSize:56, animation:"celebPulse 2s ease-in-out infinite", lineHeight:1 }}>🙏</div>
-      <h2 style={{ fontFamily:"'Lora', Georgia, serif", fontSize:34, fontWeight:400, color:"#e2cfb0", margin:0, lineHeight:1.2 }}>
+      <div style={{ animation:"celebPulse 2s ease-in-out infinite", lineHeight:1 }}>
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 5.5C9 4.12 10.12 3 11.5 3C12.88 3 14 4.12 14 5.5V11M9 5.5V11M9 5.5C9 4.12 7.88 3 6.5 3C5.12 3 4 4.12 4 5.5V14C4 17.31 6.69 20 10 20H14C17.31 20 20 17.31 20 14V11C20 9.9 19.1 9 18 9C16.9 9 16 9.9 16 11M14 5.5C14 4.12 15.12 3 16.5 3C17.88 3 19 4.12 19 5.5V11M9 11V14M11.5 11V15M14 11V14" stroke="#6b9e78" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+      <h2 style={{ fontFamily:"'Lora', Georgia, serif", fontSize:34, fontWeight:400, color:"#e8e0d4", margin:0, lineHeight:1.2 }}>
         Everyone's been<br/>prayed for!
       </h2>
-      <p style={{ fontSize:14, color:"#c9982a", margin:0, fontWeight:500 }}>
+      <p style={{ fontSize:14, color:"#6b9e78", margin:0, fontWeight:500 }}>
         {praySessionCount > prayedCount ? praySessionCount : prayedCount} of {total} this week
       </p>
       {isMonday ? (
-        <p style={{ fontSize:13, color:"#7d6a52", margin:0, lineHeight:1.7, maxWidth:280 }}>
+        <p style={{ fontSize:13, color:"#7a8082", margin:0, lineHeight:1.7, maxWidth:280 }}>
           The week just reset — keep the momentum going!
         </p>
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:4, alignItems:"center" }}>
-          <p style={{ fontSize:13, color:"#7d6a52", margin:0 }}>Check Back Monday</p>
+          <p style={{ fontSize:13, color:"#7a8082", margin:0 }}>Check Back Monday</p>
           <CountdownTicker targetTs={nextMonday} />
         </div>
       )}
-      <button onClick={() => onKeepPraying()} style={{ background:C.accent, border:"none", color:C.bg, borderRadius:12, padding:"13px 28px", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif", boxShadow:"0 4px 20px rgba(201,152,42,0.3)" }}>
+      <button onClick={() => onKeepPraying()} style={{ background:C.accent, border:"none", color:C.bg, borderRadius:12, padding:"13px 28px", fontSize:14, fontWeight:600, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif", boxShadow:"0 4px 20px rgba(107,158,120,0.3)" }}>
         Keep Praying
       </button>
-      <button onClick={onWeek} style={{ background:"none", border:"1px solid #2e2518", color:"#7d6a52", borderRadius:10, padding:"10px 20px", fontSize:13, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif" }}>
+      <button onClick={onWeek} style={{ background:"none", border:"1px solid #333839", color:"#7a8082", borderRadius:10, padding:"10px 20px", fontSize:13, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif" }}>
         View Week Summary →
       </button>
     </div>
@@ -610,7 +614,7 @@ export default function App() {
   @keyframes flyInLeft   { from { transform: translateX(110%)  rotate(6deg);  opacity: 0; } to { transform: none; opacity: 1; } }
   @keyframes flyInRight  { from { transform: translateX(-110%) rotate(-6deg); opacity: 0; } to { transform: none; opacity: 1; } }
   @keyframes confettiFall { 0% { transform: translateY(-20px) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
-  @keyframes celebPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+  @keyframes celebPulse { 0%,100%{transform:scale(1) filter:drop-shadow(0 0 0px #6b9e78)} 50%{transform:scale(1.1) filter:drop-shadow(0 0 12px #6b9e78)} }
   @keyframes bdayGlow { 0%,100%{box-shadow:0 0 8px 2px rgba(255,255,255,0.2), 0 0 0 0 rgba(255,255,255,0)} 50%{box-shadow:0 0 18px 6px rgba(255,255,255,0.35), 0 0 32px 12px rgba(255,255,255,0.1)} }
   @keyframes bdaySpin { 0%{transform:rotate(-8deg) scale(1.08)} 50%{transform:rotate(8deg) scale(1.15)} 100%{transform:rotate(-8deg) scale(1.08)} }
 `;
@@ -1649,7 +1653,7 @@ export default function App() {
                   <div style={S.personActions}>
                     <button onClick={() => { setEditBdayFor(editBdayFor === p.id ? null : p.id); setBdayInput(p.birthday || ""); setEditNameFor(null); }}
                       style={{ ...S.iconBtn, color: p.birthday ? C.accent : C.muted }} title="Set birthday"><Cake size={13} /></button>
-                    <button onClick={() => cycleGroup(p.id)} style={{ ...S.iconBtn, color: p.group === "hs" ? "#7aafc4" : p.group === "ms" ? "#c49a6c" : C.muted }} title="Cycle HS/MS/none">
+                    <button onClick={() => cycleGroup(p.id)} style={{ ...S.iconBtn, color: p.group === "hs" ? "#7aafc4" : p.group === "ms" ? "#8eba95" : C.muted }} title="Cycle HS/MS/none">
                       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.02em" }}>{p.group ? p.group.toUpperCase() : "—"}</span>
                     </button>
                     <button onClick={() => toggleType(p.id)} style={S.iconBtn} title="Toggle role"><RefreshCw size={13} /></button>
@@ -1827,7 +1831,7 @@ export default function App() {
                   recalculate
                 </button>
                 {weekHistory.length > 0 && (
-                  <button onClick={async () => { setWeekHistory([]); await apiSaveHistory([]); }} style={{ background:"none", border:"none", color:"#3d3226", fontSize:11, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif" }}>
+                  <button onClick={async () => { setWeekHistory([]); await apiSaveHistory([]); }} style={{ background:"none", border:"none", color:C.muted, fontSize:11, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif" }}>
                     clear
                   </button>
                 )}
@@ -2132,13 +2136,13 @@ const S = {
   personActions: { display: "flex", gap: 6 },
   iconBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
   gradeBadge: { fontSize: 10, padding: "2px 7px", borderRadius: 8, background: C.faint, color: C.muted, fontWeight: 500 },
-  gradeBadgeLg: { background: C.faint, color: C.muted, border: "1px solid #9a885033", marginBottom: 0 },
+  gradeBadgeLg: { background: C.faint, color: C.muted, border: `1px solid ${C.border}`, marginBottom: 0 },
   gradeRow: { display: "flex", alignItems: "center", gap: 10, padding: "7px 12px", borderTop: `1px solid ${C.faint}`, background: C.surface },
   gradeLabel: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0 },
   gradeSelect: { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, color: C.cream, padding: "4px 8px", fontSize: 13, fontFamily: "'Inter', system-ui, sans-serif", cursor: "pointer", outline: "none" },
   promoteSection: { marginTop: 4 },
   promoteBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 10, padding: "11px 16px", fontSize: 13, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif", width: "100%", textAlign: "left" },
-  promoteConfirm: { background: "#1a150a", border: `1px solid #3a2e10`, borderRadius: 10, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 },
+  promoteConfirm: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 },
   promoteConfirmText: { fontSize: 13, color: C.cream, margin: 0, lineHeight: 1.5 },
   nameRow: { display: "flex", alignItems: "center", gap: 6 },
   editNameBtn: { background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 13, padding: "0 2px", lineHeight: 1 },
@@ -2151,7 +2155,7 @@ const S = {
   inactiveRow: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${C.faint}` },
   inactiveName: { fontSize: 13, color: C.muted },
   restoreBtn: { background: "none", border: `1px solid ${C.border}`, color: C.leader, borderRadius: 7, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
-  deleteBtn: { background: "none", border: `1px solid #3a1a1a`, color: "#8a5050", borderRadius: 7, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
+  deleteBtn: { background: "none", border: `1px solid rgba(138,80,80,0.4)`, color: "#8a5050", borderRadius: 7, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
   // IMPORT
   importWrap: { flex: 1, padding: "16px 20px 28px", display: "flex", flexDirection: "column", gap: 12, overflowY: "auto" },
   importTitle: { fontFamily: "'Lora', Georgia, serif", fontSize: 26, color: C.cream, margin: 0, fontWeight: 400 },
@@ -2223,7 +2227,7 @@ const S = {
   // GROUP BADGES
   badgeRow: { display: "flex", gap: 6, marginBottom: 14 },
   hsBadge: { background: C.studentBg, color: "#7aafc4", border: "1px solid #7aafc433", marginBottom: 0 },
-  msBadge: { background: C.faint, color: "#c49a6c", border: "1px solid #c49a6c33", marginBottom: 0 },
+  msBadge: { background: C.faint, color: "#8eba95", border: "1px solid #6b9e7833", marginBottom: 0 },
   hsBadgeSm: { background: C.studentBg, color: "#7aafc4" },
-  msBadgeSm: { background: C.faint, color: "#c49a6c" },
+  msBadgeSm: { background: C.faint, color: "#8eba95" },
 };
