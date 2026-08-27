@@ -106,6 +106,32 @@ function getWeekLabel(weekStartTs) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" });
 }
 
+// Stable per-person rotation so the card looks the same each load but varies per person
+async function resizeImage(file, maxSize) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      canvas.toBlob(resolve, "image/jpeg", 0.85);
+    };
+    img.src = url;
+  });
+}
+
+function photoRotation(id) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  // Range: -6 to +6 degrees
+  return ((Math.abs(hash) % 13) - 6);
+}
+
 function genId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
@@ -888,6 +914,7 @@ export default function App() {
 
   const [addGrade, setAddGrade] = useState("");
   const [addBday, setAddBday] = useState("");
+  const [uploadingPhotoFor, setUploadingPhotoFor] = useState(null);
   const [peopleSort, setPeopleSort] = useState("name");
   const [rosterGroup, setRosterGroup] = useState("ms"); // ms | hs | leader
   const [rosterSort, setRosterSort] = useState("name"); // name | grade | birthday
@@ -913,6 +940,39 @@ export default function App() {
 
   function deactivate(id) { setPeople(prev => prev.map(p => p.id === id ? { ...p, active: false, updatedAt: Date.now() } : p)); }
   function restore(id) { setPeople(prev => prev.map(p => p.id === id ? { ...p, active: true, updatedAt: Date.now() } : p)); }
+  async function uploadPhoto(personId, file) {
+    setUploadingPhotoFor(personId);
+    try {
+      // Resize client-side before upload
+      const resized = await resizeImage(file, 600);
+      const form = new FormData();
+      form.append("photo", resized, "photo.jpg");
+      form.append("personId", personId);
+      const res = await fetch("/api/photo-upload", { method: "POST", body: form });
+      const data = await res.json();
+      if (data.url) {
+        // Store URL + cache-bust timestamp on the person record
+        setPeople(prev => prev.map(p => p.id === personId
+          ? { ...p, photoUrl: data.url + "?t=" + Date.now(), updatedAt: Date.now() }
+          : p
+        ));
+      }
+    } catch (_e) {}
+    setUploadingPhotoFor(null);
+  }
+
+  async function deletePhoto(personId) {
+    await fetch("/api/photo-upload", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ personId }),
+    }).catch(() => {});
+    setPeople(prev => prev.map(p => p.id === personId
+      ? { ...p, photoUrl: null, updatedAt: Date.now() }
+      : p
+    ));
+  }
+
   function clearAllInactive() {
     setPeople(prev => prev.filter(p => p.active !== false));
     setConfirmClearInactive(false);
@@ -1252,6 +1312,46 @@ export default function App() {
                         )}
                       </div>
 
+                      {/* Photo — taped to card */}
+                      {current?.photoUrl && (
+                        <div style={{
+                          alignSelf: "center",
+                          marginBottom: 12,
+                          position: "relative",
+                          display: "inline-block",
+                        }}>
+                          {/* Tape strip */}
+                          <div style={{
+                            position: "absolute",
+                            top: -8,
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                            width: 48,
+                            height: 14,
+                            background: "rgba(255,255,255,0.55)",
+                            borderRadius: 2,
+                            zIndex: 2,
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                          }} />
+                          <img
+                            src={current.photoUrl}
+                            alt={current.name}
+                            style={{
+                              width: 120,
+                              height: 90,
+                              objectFit: "cover",
+                              display: "block",
+                              borderRadius: 2,
+                              transform: `rotate(${photoRotation(current.id)}deg)`,
+                              boxShadow: "0 3px 12px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.3)",
+                              border: "3px solid #f0ebe4",
+                              position: "relative",
+                              zIndex: 1,
+                            }}
+                          />
+                        </div>
+                      )}
+
                       {/* Name — primary */}
                       <h2 style={S.cardName}>{current?.name}</h2>
 
@@ -1516,6 +1616,16 @@ export default function App() {
                       </div>
                     ) : (
                       <div style={S.nameRow}>
+                        {/* Photo thumbnail / upload */}
+                        <label style={{ cursor:"pointer", display:"flex", alignItems:"center", marginRight:8, flexShrink:0 }} title="Upload photo">
+                          <input type="file" accept="image/*" style={{ display:"none" }} onChange={e => { if (e.target.files[0]) uploadPhoto(p.id, e.target.files[0]); e.target.value=""; }} />
+                          {uploadingPhotoFor === p.id
+                            ? <span style={{ fontSize:11, color:C.muted }}>…</span>
+                            : p.photoUrl
+                              ? <img src={p.photoUrl} style={{ width:28, height:28, objectFit:"cover", borderRadius:3, border:`1px solid ${C.border}` }} />
+                              : <span style={{ fontSize:16, opacity:0.4 }}>📷</span>
+                          }
+                        </label>
                         <span style={S.personName}>{p.name}</span>
                         <button onClick={() => { setEditNameFor(p.id); setNameInput(p.name); setEditBdayFor(null); }}
                           style={S.editNameBtn} title="Edit name">✎</button>
@@ -1657,7 +1767,12 @@ export default function App() {
                 return (
                   <div key={p.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"11px 14px", background:C.surface, borderRadius:8, gap:8 }}>
                     <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                      {p.photoUrl && (
+                        <img src={p.photoUrl} alt={p.name} style={{ width:36, height:36, objectFit:"cover", borderRadius:3, border:"2px solid #f0ebe4", boxShadow:"0 1px 4px rgba(0,0,0,0.4)", transform:`rotate(${photoRotation(p.id)}deg)`, flexShrink:0 }} />
+                      )}
                       <span style={{ fontSize:15, color:C.cream, fontFamily:"'Lora', Georgia, serif" }}>{p.name}</span>
+                    </div>
                       <div style={{ display:"flex", gap:6, alignItems:"center" }}>
                         {p.type === "student" && p.grade && (
                           <span style={{ fontSize:11, color:C.muted }}>{ordinal(p.grade)} Grade</span>
@@ -1788,7 +1903,7 @@ export default function App() {
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             <Bell size={14} color={pushEnabled ? C.accent : C.muted} />
             <p style={{ ...S.reminderTitle, color: pushEnabled ? C.accent : C.muted, margin:0 }}>
-              {pushEnabled ? `Reminders on · ${pushTime}` : "Daily Reminders"}
+              {pushEnabled ? `Reminders on · ${(() => { const [h, m] = pushTime.split(":").map(Number); const ampm = h >= 12 ? "PM" : "AM"; const h12 = h % 12 || 12; return `${h12}:${String(m).padStart(2,"0")} ${ampm}`; })()}` : "Daily Reminders"}
             </p>
           </div>
           <span style={{ fontSize:10, color:C.muted, opacity:0.6 }}>{reminderExpanded ? "▲" : "▼"}</span>
