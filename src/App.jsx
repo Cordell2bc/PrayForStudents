@@ -991,6 +991,25 @@ export default function App() {
     ));
   }
 
+  function exportRoster() {
+    const rows = [
+      ["First Name", "Last Name", "Type", "Group", "Grade", "Birthday"],
+      ...people.filter(p => p.active !== false).map(p => {
+        const [first, ...rest] = (p.name || "").trim().split(" ");
+        const last = rest.join(" ");
+        return [first, last, p.type || "", (p.group || "").toUpperCase(), p.grade || "", p.birthday || ""];
+      })
+    ];
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "calvary-students-roster.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function clearAllInactive() {
     setPeople(prev => {
       const filtered = prev.filter(p => p.active !== false);
@@ -1898,6 +1917,17 @@ export default function App() {
                 </div>
               );
             })}
+          </div>
+
+          {/* Export */}
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 16px", background:C.surface, border:`1px solid ${C.border}`, borderRadius:12 }}>
+            <div>
+              <p style={{ margin:0, fontSize:14, color:C.cream, fontWeight:500 }}>Export Roster</p>
+              <p style={{ margin:"2px 0 0", fontSize:12, color:C.muted }}>Download all active people as a CSV</p>
+            </div>
+            <button onClick={exportRoster} style={{ background:C.accent, border:"none", color:"#fff", borderRadius:9, padding:"9px 16px", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif", display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
+              <Upload size={14} />Export
+            </button>
           </div>
 
           <h3 style={S.importTitle}>Import CSV</h3>
