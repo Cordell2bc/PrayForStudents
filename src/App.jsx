@@ -1786,12 +1786,12 @@ export default function App() {
                     </div>
                       <div style={{ display:"flex", gap:6, alignItems:"center" }}>
                         {p.type === "student" && p.grade && (
-                          <span style={{ fontSize:11, color:C.muted }}>{ordinal(p.grade)} Grade</span>
+                          <span style={{ fontSize:13, color:C.muted }}>{ordinal(p.grade)} Grade</span>
                         )}
                         {p.type === "leader" && p.group && (
-                          <span style={{ fontSize:11, color:C.muted }}>{p.group.toUpperCase()}</span>
+                          <span style={{ fontSize:13, color:C.muted }}>{p.group.toUpperCase()}</span>
                         )}
-                        {bdayFmt && <span style={{ fontSize:11, color:C.muted, display:"flex", alignItems:"center", gap:3 }}><Cake size={10} />{bdayFmt}</span>}
+                        {bdayFmt && <span style={{ fontSize:13, color:C.muted, display:"flex", alignItems:"center", gap:3 }}><Cake size={12} />{bdayFmt}</span>}
                       </div>
                     </div>
                     <div style={{ display:"flex", gap:4 }}>
