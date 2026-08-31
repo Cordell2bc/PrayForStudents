@@ -779,6 +779,17 @@ export default function App() {
 
   const pinnedPerson = pinnedPersonId ? activePeople.find(p => p.id === pinnedPersonId) ?? null : null;
   const current = pinnedPerson ?? deck[cardIdx] ?? null;
+
+  // Preload adjacent photos so they're cached before the swipe animation ends
+  React.useEffect(() => {
+    const toPreload = [deck[cardIdx - 1], deck[cardIdx + 1]].filter(Boolean);
+    toPreload.forEach(p => {
+      if (p?.photoUrl) {
+        const img = new Image();
+        img.src = p.photoUrl;
+      }
+    });
+  }, [cardIdx, deck]);
   const prayedPeople = activePeople.filter(p => withinWeek(p.prayedAt));
 
   // Streak: consecutive weeks where count >= total (everyone prayed for)
