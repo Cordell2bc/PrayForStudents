@@ -1540,22 +1540,15 @@ export default function App() {
               ))}
             </div>
           )}
-
-          {streak > 0 && (
+{streak > 0 && (
             <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 16px", background:C.accentBg, border:`1px solid ${C.accent}44`, borderRadius:12 }}>
               <svg width="18" height="18" viewBox="0 0 20 20" style={{ flexShrink:0 }}><path d="M10,2 L11.768,8.232 L18,10 L11.768,11.768 L10,18 L8.232,11.768 L2,10 L8.232,8.232 Z" fill="#6b9e78" /></svg>
-              <span style={{ fontSize:14, color:C.cream, fontFamily:"'Lora', Georgia, serif", lineHeight:1.3 }}>
-                {streak} week{streak !== 1 ? "s" : ""} in a row — everyone prayed for
-              </span>
-            </div>
-          )}
-
-          {streak > 0 && (
-            <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 16px", background:C.accentBg, border:`1px solid ${C.accent}44`, borderRadius:12 }}>
-              <svg width="18" height="18" viewBox="0 0 20 20" style={{ flexShrink:0 }}><path d="M10,2 L11.768,8.232 L18,10 L11.768,11.768 L10,18 L8.232,11.768 L2,10 L8.232,8.232 Z" fill="#6b9e78" /></svg>
-              <span style={{ fontSize:14, color:C.cream, fontFamily:"'Lora', Georgia, serif", lineHeight:1.3 }}>
-                {streak} week{streak !== 1 ? "s" : ""} in a row — everyone prayed for
-              </span>
+              <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
+                <span style={{ fontSize:10, color:C.accent, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.08em", fontFamily:"'Inter', system-ui, sans-serif" }}>Prayer Streak</span>
+                <span style={{ fontSize:14, color:C.cream, fontFamily:"'Lora', Georgia, serif", lineHeight:1.3 }}>
+                  {streak} week{streak !== 1 ? "s" : ""} in a row — everyone prayed for
+                </span>
+              </div>
             </div>
           )}
 
