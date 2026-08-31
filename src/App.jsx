@@ -1425,7 +1425,7 @@ export default function App() {
                         {withinWeek(current?.prayedAt) ? (
                           <span style={S.prayedChip}>✓ Prayed {timeAgo(current.prayedAt)}</span>
                         ) : current?.prayedAt ? (
-                          <span style={S.lastPrayedChip}>Last Prayed For On: {timeAgo(current.prayedAt)}</span>
+                          <span style={S.lastPrayedChip}>Last Prayed For: {timeAgo(current.prayedAt)}</span>
                         ) : (
                           <span style={S.neverChip}>Not yet prayed for</span>
                         )}
