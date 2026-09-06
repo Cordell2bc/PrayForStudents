@@ -1375,7 +1375,7 @@ export default function App() {
                       {current?.photoUrl && (
                         <div style={{
                           position: "absolute",
-                          bottom: 72,
+                          top: 20,
                           right: 20,
                           zIndex: 3,
                           display: "inline-block",
