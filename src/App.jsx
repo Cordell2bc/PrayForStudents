@@ -60,13 +60,12 @@ async function apiLoad() {
   return data;
 }
 
-async function apiSave(people) {
-  // Never overwrite KV with an empty list — this prevents accidental data wipes
+async function apiSave(people, force = false) {
   if (!people || people.length === 0) return;
   await fetch("/api/data", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(people),
+    body: JSON.stringify(force ? { data: people, force: true } : people),
   });
 }
 
@@ -1025,7 +1024,7 @@ export default function App() {
     setPeople(prev => {
       const filtered = prev.filter(p => p.active !== false);
       // Save immediately — don't wait for debounce
-      apiSave(filtered).catch(() => {});
+      apiSave(filtered, true).catch(() => {});
       return filtered;
     });
     setConfirmClearInactive(false);
@@ -1034,7 +1033,7 @@ export default function App() {
   function deletePerm(id) {
     setPeople(prev => {
       const filtered = prev.filter(p => p.id !== id);
-      apiSave(filtered).catch(() => {});
+      apiSave(filtered, true).catch(() => {});
       return filtered;
     });
   }
