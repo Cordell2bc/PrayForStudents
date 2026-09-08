@@ -1,0 +1,2463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Calvary Students Check-In</title>
+<link rel="manifest" href="/manifest.json" />
+<link rel="icon" href="/favicon-32.png" sizes="32x32" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black" />
+<meta name="theme-color" content="#000000" />
+
+<!--
+  ============================================================================
+  CALVARY STUDENTS CHECK-IN
+  Single-file React app. Deploy the /dist output of this file (as-is) to
+  Cloudflare Pages, same pattern as your other tools.
+
+  SETUP — read this before deploying:
+  1. Create a Firebase project (or reuse an existing one).
+  2. Enable Firestore (production mode is fine).
+  3. Paste your Firebase config into FIREBASE_CONFIG below.
+  4. Change LEADER_PASSCODE and ADMIN_PASSCODE below to your own.
+  5. Suggested Firestore security rules (lock reads/writes behind passcodes
+     being irrelevant to Firestore rules — since this is a kiosk app with no
+     real auth, the simplest safe approach is to restrict your Firestore
+     rules to only allow access from your Cloudflare Pages domain via
+     App Check, OR just keep the DB non-sensitive-only and accept that this
+     is "obscurity" security appropriate for a church kiosk. If you want real
+     auth later, swap the passcode gates for Firebase Auth.)
+  6. On each tablet: open the app once, tap "Set Up This Tablet", enter the
+     ADMIN_PASSCODE, and choose HS or MS. It's saved in that browser's local
+     storage from then on (add the page to the home screen for kiosk mode).
+
+  DATA MODEL (Firestore collections):
+  students/{id}: {
+    name, birthday, grade (5-12, or null for leaders), roster (array, e.g. ["MS"] or ["MS","HS"]),
+    role ("student"|"leader"), phone, email, active (bool),
+    emergency: { relationship, name, phone, email },
+    createdAt
+  }
+  attendance/{id}: {
+    studentId, studentName, room ("MS"|"HS"), event (string),
+    date (YYYY-MM-DD), timestamp
+  }
+  ============================================================================
+-->
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.8/babel.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4" crossorigin="anonymous"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg-deep: #0A0A0A;
+    --bg-panel: #1A1A1A;
+    --bg-panel-raised: #262626;
+    --accent-gold: #FFD400;
+    --accent-coral: #7A3327;
+    --accent-purple: #FFD400;
+    --accent-teal: #FFD400;
+    --accent: #FFD400;
+    --accent-readable: #FFD400;
+    --accent-text: #161200;
+    --accent-tint-10: rgba(255,212,0,0.10);
+    --accent-tint-18: rgba(255,212,0,0.18);
+    --text-light: #FFFFFF;
+    --text-muted: #B0B0B0;
+    --border-soft: #3D3D3D;
+    --danger-tint-18: rgba(122,51,39,0.18);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; height: 100dvh;
+    background: var(--bg-deep);
+    color: var(--text-light);
+    font-family: 'Inter', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  #root { height: 100%; height: 100dvh; }
+  h1, h2, h3, .display { font-family: 'Space Grotesk', sans-serif; }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+  button { font-family: inherit; cursor: pointer; }
+  input, select { font-family: inherit; }
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--border-soft); border-radius: 8px; }
+
+  .app {
+    height: 100%; display: flex; flex-direction: column; background: var(--bg-deep);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  /* ---------- Kiosk header ---------- */
+  .kiosk-header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 22px 32px 14px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .kiosk-header .room-name {
+    font-size: 30px; font-weight: 700; letter-spacing: -0.02em;
+  }
+  .kiosk-header .room-name .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 13px; font-weight: 600; margin-left: 10px; vertical-align: middle;
+    font-family: 'Inter', sans-serif;
+    background: var(--accent-tint-18); color: var(--accent-readable);
+  }
+  .kiosk-header .date { color: var(--text-muted); font-size: 15px; }
+
+  /* ---------- Search ---------- */
+  .search-wrap { padding: 16px 32px; }
+  .search-input {
+    width: 100%; padding: 16px 20px; font-size: 20px;
+    background: var(--bg-panel); border: 1px solid var(--border-soft);
+    border-radius: 14px; color: var(--text-light); outline: none;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--text-muted); }
+
+  /* ---------- Roster grid ---------- */
+  .roster-scroll { flex: 1; overflow-y: auto; padding: 4px 32px 120px; }
+  .grade-group { margin-bottom: 22px; }
+  .grade-label {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-muted); margin: 0 0 10px 4px; font-weight: 600;
+  }
+  .tile-grid {
+    display: grid; grid-template-columns: repeat(var(--kiosk-columns, 4), 1fr);
+    gap: 12px;
+  }
+  .name-tile {
+    position: relative; background: var(--bg-panel); border: 1px solid var(--border-soft);
+    border-radius: 16px; padding: 16px 14px 14px; text-align: center;
+    min-height: 84px; display: flex; flex-direction: column; justify-content: center;
+    transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+    color: var(--text-light);
+  }
+  .name-tile:active { transform: scale(0.96); }
+  .name-tile .n { font-size: 23px; font-weight: 700; line-height: 1.25; }
+
+  /* ---------- Floating buttons ---------- */
+  .fab-row {
+    position: fixed; bottom: 22px; left: 32px; right: 32px;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  }
+  .fab-gear {
+    background: var(--bg-panel-raised); border: 1px solid var(--border-soft); color: var(--text-muted);
+    width: 52px; height: 52px; border-radius: 50%; font-size: 20px;
+  }
+
+  /* ---------- Modal / full-screen overlay ---------- */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(10,11,24,0.75);
+    display: flex; align-items: center; justify-content: center; z-index: 50;
+    padding: 24px;
+  }
+  .sheet {
+    background: var(--bg-panel); border: 1px solid var(--border-soft);
+    border-radius: 20px; width: 100%; max-width: 560px; max-height: 90vh;
+    overflow-y: auto; padding: 28px;
+  }
+  .sheet.wide { max-width: 900px; }
+  .sheet h2 { margin: 0 0 6px; font-size: 24px; }
+  .sheet .sub { color: var(--text-muted); font-size: 14px; margin-bottom: 20px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; }
+  .field input, .field select {
+    width: 100%; padding: 13px 14px; font-size: 16px;
+    background: var(--bg-deep); border: 1px solid var(--border-soft);
+    border-radius: 10px; color: var(--text-light); outline: none;
+  }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .field-row .field { min-width: 0; }
+  .section-title { font-size: 15px; font-weight: 700; margin: 22px 0 10px; color: var(--accent-teal); }
+  .btn-row { display: flex; gap: 10px; margin-top: 22px; }
+  .btn {
+    flex: 1; padding: 14px; border-radius: 10px; border: none; font-weight: 700; font-size: 15px;
+  }
+  .btn.primary { background: var(--accent); color: var(--accent-text); }
+  .btn.secondary { background: var(--bg-panel-raised); color: var(--text-light); border: 1px solid var(--border-soft); }
+  .btn.danger { background: rgba(122,51,39,0.15); color: var(--accent-coral); border: 1px solid var(--accent-coral); }
+  .btn:disabled { opacity: 0.5; }
+  .error-text { color: var(--accent-coral); font-size: 13px; margin-top: -8px; margin-bottom: 12px; }
+
+  .toast {
+    position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--accent-teal); color: #06251F; font-weight: 700;
+    padding: 16px 28px; border-radius: 14px; z-index: 100; font-size: 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    text-align: center; white-space: pre-line; line-height: 1.5;
+  }
+  @keyframes confetti-fall {
+    0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  }
+
+  /* ---------- Setup screen ---------- */
+  .setup-screen {
+    height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px;
+  }
+  .setup-screen .title { font-size: 26px; font-weight: 700; }
+  .room-choice-row { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; max-width: 460px; }
+  .room-choice {
+    width: 200px; height: 160px; border-radius: 20px; border: 1px solid var(--border-soft);
+    background: var(--bg-panel); display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; font-size: 20px; font-weight: 700; color: var(--text-light);
+  }
+  .room-choice.MS:active, .room-choice.MS.sel { border-color: #FFD400; background: rgba(255,212,0,0.1); }
+  .room-choice.HS:active, .room-choice.HS.sel { border-color: #7A3327; background: rgba(122,51,39,0.1); }
+  .room-choice.SUNDAY:active, .room-choice.SUNDAY.sel { border-color: #7A3327; background: rgba(122,51,39,0.1); }
+  .room-choice.EVENT:active, .room-choice.EVENT.sel { border-color: #FFFFFF; background: rgba(255,255,255,0.08); }
+
+  /* ---------- Admin ---------- */
+  .admin-tabs {
+    display: flex; gap: 8px; padding: 16px 28px 0; border-bottom: 1px solid var(--border-soft); flex-wrap: wrap;
+  }
+  .admin-tab {
+    background: none; border: none; color: var(--text-muted); padding: 10px 6px 14px; font-size: 15px; font-weight: 600;
+    border-bottom: 2px solid transparent;
+  }
+  .admin-tab.active { color: var(--accent-gold); border-color: var(--accent-gold); }
+  .admin-body { flex: 1; overflow-y: auto; padding: 22px 28px 60px; }
+  .admin-header {
+    display: flex; justify-content: space-between; align-items: center; padding: 18px 28px 0;
+  }
+  .row-list { display: flex; flex-direction: column; gap: 8px; }
+  .row-item {
+    background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: 12px;
+    padding: 14px 16px; display: flex; justify-content: space-between; align-items: center;
+    color: var(--text-light);
+  }
+  .row-item .rn { font-weight: 600; font-size: 17px; color: var(--text-light); }
+  .row-item .rs { color: var(--text-muted); font-size: 13px; }
+  .pill { font-size: 12px; padding: 3px 9px; border-radius: 20px; font-weight: 600; }
+  .pill.MS { background: rgba(255,212,0,0.18); color: #FFD400; }
+  .pill.HS { background: rgba(122,51,39,0.18); color: #D9704F; }
+  .pill.inactive { background: rgba(146,150,184,0.18); color: var(--text-muted); }
+  .empty-state { text-align: center; color: var(--text-muted); padding: 60px 20px; }
+  .chart-card {
+    background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: 16px; padding: 20px; margin-bottom: 20px;
+  }
+  .chart-card h3 { margin: 0 0 14px; font-size: 16px; }
+  canvas { max-height: 260px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+  .stat-card { background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: 14px; padding: 16px; text-align: center; }
+  .stat-card .num { font-size: 28px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
+  .stat-card .lbl { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useRef } = React;
+
+// ============================================================================
+// CONFIG — edit these before deploying
+// ============================================================================
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCTvJnRdj9s0EIM0_NKS3HmmMAejvb0Tro",
+  authDomain: "calvary-students-checkin.firebaseapp.com",
+  projectId: "calvary-students-checkin",
+  storageBucket: "calvary-students-checkin.firebasestorage.app",
+  messagingSenderId: "760549847459",
+  appId: "1:760549847459:web:5b3a12a3b12841ea4a6a16"
+};
+const LEADER_PASSCODE = "attendance";   // check kids in manually, view new signups
+const ADMIN_PASSCODE = "Promo1398!";    // rosters, profiles, trends, promote, tablet setup
+const CONSECUTIVE_MISS_ALERT = 3; // weeks in a row missed before flagging
+
+
+
+// ============================================================================
+// Diagnostic error catcher — shows the actual error on screen instead of a
+// blank/black screen, so any crash can be screenshotted and reported.
+// Safe to leave in permanently; it only activates if something breaks.
+//
+// reportFatalError starts out as a raw-DOM fallback (for the unlikely case
+// something breaks before React has even mounted), then gets replaced by
+// the ErrorBoundary below with a proper React setState call once it mounts —
+// letting React manage the DOM change itself instead of us fighting it with
+// direct innerHTML writes, which previously caused a SECOND masking error
+// ("node to be removed is not a child of this node") that hid the real one.
+// ============================================================================
+function rawDomFatalError(details) {
+  const root = document.getElementById("root");
+  if (!root) return;
+  root.innerHTML =
+    '<div style="padding:24px;color:#fff;background:#0A0A0A;font-family:monospace;white-space:pre-wrap;min-height:100vh;box-sizing:border-box;">' +
+    '<h2 style="color:#E10600;margin-top:0;">Something went wrong</h2>' +
+    '<p style="font-family:sans-serif;">Please screenshot this whole screen and send it over.</p>' +
+    '<pre style="background:#1A1A1A;padding:16px;border-radius:8px;overflow:auto;border:1px solid #3D3D3D;">' +
+    String(details).replace(/</g, "&lt;") +
+    '</pre></div>';
+}
+let reportFatalError = rawDomFatalError;
+
+window.addEventListener("error", (event) => {
+  reportFatalError((event.error && event.error.stack) || event.message || "Unknown error");
+});
+window.addEventListener("unhandledrejection", (event) => {
+  const reason = event.reason;
+  reportFatalError((reason && reason.stack) || (reason && reason.message) || String(reason) || "Unknown promise rejection");
+});
+
+// ============================================================================
+// Firebase init
+// ============================================================================
+let db = null;
+try {
+  const fbApp = firebase.initializeApp(FIREBASE_CONFIG);
+  db = firebase.firestore();
+} catch (e) {
+  console.error("Firebase init failed — check FIREBASE_CONFIG.", e);
+}
+
+// Formats a Date using its LOCAL calendar date (not UTC) — critical for a
+// check-in app, since toISOString() is always UTC and would roll over to
+// the next day several hours before midnight actually arrives locally
+// (e.g. 8pm Eastern is already past midnight UTC).
+function localDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+const todayStr = () => localDateStr(new Date());
+const fmtDate = (d) => new Date(d + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+function defaultEventForRoom(room) {
+  if (room === "SUNDAY") return "Sunday Morning";
+  const day = new Date().getDay(); // 0 Sun, 3 Wed
+  if (day === 0) return "Sunday Morning";
+  if (day === 3) return room === "MS" ? "Torrid (Wed)" : "The Barn (Wed)";
+  return "Check-in";
+}
+
+function gradeSort(a, b) { return (a.grade || 0) - (b.grade || 0); }
+
+// Normalizes a student's roster field to always be an array. Handles legacy
+// records from before the multi-roster (MS+HS) format was added, where
+// roster was stored as a plain string (e.g. "HS") instead of an array
+// (e.g. ["HS"]) — those old records would otherwise crash anywhere the
+// app calls .join()/.includes() on roster expecting an array.
+function rosterArray(s) {
+  if (Array.isArray(s.roster)) return s.roster;
+  if (typeof s.roster === "string" && s.roster) return [s.roster];
+  return [];
+}
+
+// Sort by last name (the last space-separated word in the full name),
+// falling back to full-name comparison for ties.
+function lastNameOf(fullName) {
+  const parts = (fullName || "").trim().split(/\s+/);
+  return parts[parts.length - 1] || "";
+}
+function byLastName(a, b) {
+  return lastNameOf(a.name).localeCompare(lastNameOf(b.name)) || a.name.localeCompare(b.name);
+}
+
+// Absence tracking is week-based, not raw-date-based: a student who attends
+// EITHER a Wednesday or a Sunday in a given week counts as present that
+// week. This avoids flagging a kid who, say, misses Sunday + Wednesday +
+// Sunday over one vacation (which is really only ~2 weeks of actual misses)
+// while still catching kids who genuinely go multiple full weeks dark.
+function weekKeyFor(dateStr) {
+  const d = new Date(dateStr + "T12:00:00");
+  d.setDate(d.getDate() - d.getDay()); // roll back to that week's Sunday
+  return localDateStr(d);
+}
+function recentActiveWeeksForRoom(attendance, room, n) {
+  const weeks = [...new Set(attendance.filter(a => a.room === room).map(a => weekKeyFor(a.date)))];
+  return weeks.sort().reverse().slice(0, n);
+}
+function missedAllWeeks(attendance, studentId, weeks) {
+  if (weeks.length === 0) return false;
+  return weeks.every(wk => !attendance.some(a => a.studentId === studentId && weekKeyFor(a.date) === wk));
+}
+
+// Month-day match only — the stored year is sometimes a placeholder
+// (imported records with unknown birth year), so comparing the full date
+// would never match; birthday celebrations only care about month/day.
+// Matches yesterday, today, or tomorrow — built from real Date objects
+// (not manual month-day arithmetic) so it handles month/year boundaries
+// correctly, e.g. a Jan 1 birthday still matching on Dec 31.
+function isBirthdayNearby(student) {
+  if (!student.birthday) return false;
+  const parts = student.birthday.split("-");
+  const bdayMonth = parseInt(parts[1], 10);
+  const bdayDay = parseInt(parts[2], 10);
+  const now = new Date();
+  for (const offset of [-1, 0, 1]) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+    if (d.getMonth() + 1 === bdayMonth && d.getDate() === bdayDay) return true;
+  }
+  return false;
+}
+
+// The ministry year runs Labor Day to Labor Day. Labor Day = first Monday
+// of September.
+function laborDayOf(year) {
+  const d = new Date(year, 8, 1); // Sept 1
+  const dow = d.getDay(); // 0=Sun..6=Sat
+  d.setDate(1 + ((1 - dow + 7) % 7));
+  return d;
+}
+function ministryYearStart() {
+  const now = new Date();
+  const thisYear = laborDayOf(now.getFullYear());
+  return now >= thisYear ? thisYear : laborDayOf(now.getFullYear() - 1);
+}
+
+// Buckets an attendance record's event name into one of the three
+// categories used for attendance-percentage reporting.
+function categorizeEvent(event) {
+  if (event === "Sunday Morning") return "sunday";
+  if (event && event.includes("(Wed)")) return "wednesday";
+  return "events";
+}
+
+// Whether an attendance record came from a combined kiosk (Sunday/Event —
+// merge across rooms) or a dedicated one (Wednesday MS/HS — keep separate).
+// Prefers the explicit `combined` field written at check-in time; falls
+// back to guessing from the event name only for older records written
+// before that field existed (which could misfire if testing happened on a
+// non-Wednesday day, since both dedicated kiosks then shared the same
+// generic "Check-in" label).
+function isRecordCombined(a) {
+  if (typeof a.combined === "boolean") return a.combined;
+  return !(a.event === "Torrid (Wed)" || a.event === "The Barn (Wed)");
+}
+
+// A session object's `room` is set whenever it's room-scoped (split), and
+// null when it's a combined Sunday/Event session. "Torrid (Wed)" / "The
+// Barn (Wed)" already say which room by name, so no suffix is needed there
+// — but anything else that's room-scoped (most commonly the generic
+// "Check-in" fallback used on non-Wednesday testing days) looks identical
+// for MS and HS without one, so append it in that case.
+function sessionLabel(session) {
+  if (session.room === null) return session.event;
+  if (session.event === "Torrid (Wed)" || session.event === "The Barn (Wed)") return session.event;
+  return `${session.event} (${session.room === "MS" ? "Middle School" : "High School"})`;
+}
+
+// ============================================================================
+// Offline check-in queue
+//
+// Firestore's web SDK does NOT reject a write's promise when offline — it
+// just hangs silently until connectivity returns, then resolves as if
+// nothing happened. A plain try/catch never fires, so it can't be used to
+// detect "we're offline" here. Instead, every write races against a short
+// timeout: if it doesn't resolve in time, we assume the network is down,
+// stash the record in localStorage, and keep the roster tile hidden.
+//
+// Each check-in gets a deterministic ID (set on it, not the auto-ID from
+// add()) BEFORE the write is attempted. If the original write eventually
+// completes in the background after we've already timed out and queued it
+// — and then a later retry from the queue also succeeds — both writes
+// target the exact same document ID, so the second is a harmless overwrite
+// of identical data rather than a duplicate check-in record.
+// ============================================================================
+const PENDING_QUEUE_KEY = "cs_pending_checkins";
+const WRITE_TIMEOUT_MS = 4000;
+
+function generateClientId() {
+  return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+function loadPendingQueue() {
+  try { return JSON.parse(localStorage.getItem(PENDING_QUEUE_KEY) || "[]"); }
+  catch (e) { return []; }
+}
+function savePendingQueue(q) {
+  try { localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(q)); } catch (e) {}
+}
+
+// Attempts the write; on timeout (offline) queues it for later and returns
+// false. The caller should treat both outcomes as "the check-in happened"
+// for UI purposes — the record itself carries a clientId so a caller can
+// always find it again exactly once, in Firestore or in the local queue.
+async function writeAttendanceRecord(record, onQueued) {
+  const clientId = generateClientId();
+  const writePromise = db.collection("attendance").doc(clientId)
+    .set({ ...record, timestamp: firebase.firestore.FieldValue.serverTimestamp() })
+    .then(() => "ok").catch(() => "error");
+  const timeoutPromise = new Promise(resolve => setTimeout(() => resolve("timeout"), WRITE_TIMEOUT_MS));
+  const result = await Promise.race([writePromise, timeoutPromise]);
+  if (result !== "ok") {
+    const item = { ...record, clientId, queuedAt: Date.now() };
+    const next = [...loadPendingQueue(), item];
+    savePendingQueue(next);
+    if (onQueued) onQueued(next);
+    return false;
+  }
+  return true;
+}
+
+// Retries everything currently queued. Each retry uses the SAME clientId
+// stored with the item, so it's always safe to re-attempt — Firestore just
+// overwrites the same doc if an earlier attempt eventually also lands.
+async function flushPendingQueue(onChange) {
+  const current = loadPendingQueue();
+  if (current.length === 0) return;
+  const stillPending = [];
+  for (const item of current) {
+    const { clientId, queuedAt, ...record } = item;
+    try {
+      const writePromise = db.collection("attendance").doc(clientId)
+        .set({ ...record, timestamp: firebase.firestore.FieldValue.serverTimestamp() })
+        .then(() => "ok").catch(() => "error");
+      const timeoutPromise = new Promise(resolve => setTimeout(() => resolve("timeout"), WRITE_TIMEOUT_MS));
+      const result = await Promise.race([writePromise, timeoutPromise]);
+      if (result !== "ok") stillPending.push(item);
+    } catch (e) {
+      stillPending.push(item);
+    }
+  }
+  savePendingQueue(stillPending);
+  if (onChange) onChange(stillPending);
+}
+
+// Per-student attendance percentage since the start of the current ministry
+// year, broken out by Sunday / Wednesday / Events. "Total" for each category
+// is the number of distinct dates ANYONE recorded that category — i.e. how
+// many of those sessions actually happened — not a fixed calendar count.
+function attendanceStatsForStudent(studentId, attendance) {
+  const startStr = localDateStr(ministryYearStart());
+  const inRange = attendance.filter(a => a.date >= startStr);
+  const result = {};
+  ["sunday", "wednesday", "events"].forEach(cat => {
+    const allDates = new Set(inRange.filter(a => categorizeEvent(a.event) === cat).map(a => a.date));
+    const studentDates = new Set(inRange.filter(a => a.studentId === studentId && categorizeEvent(a.event) === cat).map(a => a.date));
+    const total = allDates.size;
+    result[cat] = { attended: studentDates.size, total, pct: total > 0 ? Math.round((studentDates.size / total) * 100) : null };
+  });
+  return result;
+}
+
+// ============================================================================
+// Kiosk color themes. HS + Sunday Morning always use "red"; MS always uses
+// "yellow"; Special Event lets a leader pick any of these for the day.
+// Only the Kiosk screen (roster, check-in, new-student form, gear menu) is
+// themed — the Admin dashboard always stays on the default look below.
+// ============================================================================
+const THEMES = {
+  red:    { label: "Barn Red",      swatch: "#7A3327", bgDeep: "#0A0A0A", bgPanel: "#1A1A1A", bgPanelRaised: "#262626", borderSoft: "#3D3D3D", textLight: "#FFFFFF", textMuted: "#B0B0B0", accent: "#7A3327", accentText: "#FFFFFF", accentReadable: "#D9704F" },
+  yellow: { label: "Gold Rush",     swatch: "#FFD400", bgDeep: "#0A0A0A", bgPanel: "#1A1A1A", bgPanelRaised: "#262626", borderSoft: "#3D3D3D", textLight: "#FFFFFF", textMuted: "#B0B0B0", accent: "#FFD400", accentText: "#161200", accentReadable: "#FFD400" },
+  ocean:  { label: "Ocean Blue",    swatch: "#00B4D8", bgDeep: "#050D14", bgPanel: "#0D1B2A", bgPanelRaised: "#152A3F", borderSoft: "#2A3F52", textLight: "#F2FAFC", textMuted: "#8FB4C4", accent: "#00B4D8", accentText: "#03222B", accentReadable: "#00B4D8" },
+  purple: { label: "Neon Purple",   swatch: "#B14EFF", bgDeep: "#0D0714", bgPanel: "#1B1029", bgPanelRaised: "#2A1B3D", borderSoft: "#3D2A52", textLight: "#F6F0FC", textMuted: "#B3A0C4", accent: "#B14EFF", accentText: "#FFFFFF", accentReadable: "#B14EFF" },
+  green:  { label: "Forest Green",  swatch: "#2ECC71", bgDeep: "#06140C", bgPanel: "#0F2818", bgPanelRaised: "#183B25", borderSoft: "#2C4F3A", textLight: "#F0FCF5", textMuted: "#9FC4AF", accent: "#2ECC71", accentText: "#06210F", accentReadable: "#2ECC71" },
+  pink:   { label: "Pink Pop",      swatch: "#FF3D81", bgDeep: "#160810", bgPanel: "#24101B", bgPanelRaised: "#361A29", borderSoft: "#4D2A3B", textLight: "#FCF0F5", textMuted: "#C4A0B1", accent: "#FF3D81", accentText: "#FFFFFF", accentReadable: "#FF3D81" },
+};
+
+function hexToRgba(hex, alpha) {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function themeToCssVars(theme) {
+  return {
+    "--bg-deep": theme.bgDeep,
+    "--bg-panel": theme.bgPanel,
+    "--bg-panel-raised": theme.bgPanelRaised,
+    "--border-soft": theme.borderSoft,
+    "--text-light": theme.textLight,
+    "--text-muted": theme.textMuted,
+    "--accent": theme.accent,
+    "--accent-readable": theme.accentReadable,
+    "--accent-text": theme.accentText,
+    "--accent-tint-10": hexToRgba(theme.accent, 0.10),
+    "--accent-tint-18": hexToRgba(theme.accent, 0.18),
+  };
+}
+
+// ============================================================================
+// Root App
+// ============================================================================
+function App() {
+  const [room, setRoom] = useState(() => localStorage.getItem("cs_room") || null);
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [adminLevel, setAdminLevel] = useState(null);
+  const [showSetup, setShowSetup] = useState(!room);
+  const [students, setStudents] = useState([]);
+  const [attendance, setAttendance] = useState([]); // all-time, kept light (id, studentId, room, event, date)
+  const [guests, setGuests] = useState([]); // provisional one-time event signups, separate from the roster
+  const [settings, setSettings] = useState({}); // shared app-wide settings (new-signups banner, kiosk grid columns, ...)
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    if (!db) return;
+    const unsub1 = db.collection("students").onSnapshot(snap => {
+      setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, err => reportFatalError("Firestore error reading 'students':\n\n" + (err.stack || err.message || err)));
+    const unsub2 = db.collection("attendance").onSnapshot(snap => {
+      setAttendance(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, err => reportFatalError("Firestore error reading 'attendance':\n\n" + (err.stack || err.message || err)));
+    const unsub3 = db.collection("eventGuests").onSnapshot(snap => {
+      setGuests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, err => reportFatalError("Firestore error reading 'eventGuests':\n\n" + (err.stack || err.message || err)));
+    const unsub4 = db.collection("settings").doc("adminMeta").onSnapshot(snap => {
+      setSettings(snap.exists ? snap.data() : {});
+      setSettingsLoaded(true);
+    }, err => reportFatalError("Firestore error reading 'settings':\n\n" + (err.stack || err.message || err)));
+    return () => { unsub1(); unsub2(); unsub3(); unsub4(); };
+  }, []);
+
+  // A tablet set to MS/HS/Sunday is meant to be permanently dedicated to
+  // that room, so it should stay that way across reloads. A Special Event
+  // is different — it's a one-day, borrowed use of whatever tablet is
+  // handy, not a permanent identity. So if this tablet was last an Event
+  // kiosk and that event's day has already passed (no fresh one started
+  // yet), fall back to the room-selection screen instead of silently
+  // re-opening straight into "name today's event" again.
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    if (room === "EVENT") {
+      const eventToday = settings.eventToday;
+      const eventStillCurrent = eventToday && eventToday.date === todayStr();
+      if (!eventStillCurrent) setShowSetup(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsLoaded]);
+
+  function flashToast(msg, duration = 2200) {
+    setToast(msg);
+    setTimeout(() => setToast(null), duration);
+  }
+
+  function chooseRoom(r) {
+    localStorage.setItem("cs_room", r);
+    setRoom(r);
+    setShowSetup(false);
+  }
+
+  if (!db) {
+    return <div style={{padding: 40, color: "var(--accent-coral)"}}>
+      Firebase isn't configured yet. Edit FIREBASE_CONFIG near the top of this file.
+    </div>;
+  }
+
+  if (showAdmin) {
+    return (
+      <div className="app">
+        {toast && <div className="toast">{toast}</div>}
+        <Admin students={students} attendance={attendance} guests={guests} settings={settings}
+               initialLevel={adminLevel}
+               onClose={() => { setShowAdmin(false); setAdminLevel(null); }}
+               flashToast={flashToast} />
+      </div>
+    );
+  }
+
+  if (showSetup) {
+    return <SetupScreen onChoose={chooseRoom} adminPasscode={ADMIN_PASSCODE} leaderPasscode={LEADER_PASSCODE} hasRoom={!!room} onCancel={() => setShowSetup(false)}
+                        onOpenAdmin={(level) => { setAdminLevel(level); setShowAdmin(true); }} />;
+  }
+
+  return (
+    <div className="app">
+      {toast && <div className="toast">{toast}</div>}
+      <Kiosk room={room} students={students} attendance={attendance} settings={settings}
+             onOpenAdmin={(level) => { setAdminLevel(level); setShowAdmin(true); }}
+             onOpenSetup={() => setShowSetup(true)}
+             flashToast={flashToast} />
+    </div>
+  );
+}
+
+// ============================================================================
+// Setup screen — pick / change room, gated behind admin passcode if changing
+// ============================================================================
+function SetupScreen({ onChoose, adminPasscode, leaderPasscode, hasRoom, onCancel, onOpenAdmin }) {
+  const [code, setCode] = useState("");
+  const [unlocked, setUnlocked] = useState(!hasRoom); // no gate needed on very first setup
+  const [error, setError] = useState("");
+  const [showDashLogin, setShowDashLogin] = useState(false);
+  const [dashCode, setDashCode] = useState("");
+  const [dashError, setDashError] = useState("");
+
+  function tryUnlock() {
+    if (code === adminPasscode) { setUnlocked(true); setError(""); }
+    else setError("Wrong passcode.");
+  }
+
+  function tryDashLogin() {
+    if (dashCode === adminPasscode) onOpenAdmin("admin");
+    else if (dashCode === leaderPasscode) onOpenAdmin("leader");
+    else setDashError("Wrong passcode.");
+  }
+
+  return (
+    <div className="setup-screen">
+      <div className="title">Set Up This Tablet</div>
+      {!unlocked ? (
+        <div style={{ width: 280 }}>
+          <div className="field">
+            <label>Admin passcode</label>
+            <input type="password" value={code} onChange={e => setCode(e.target.value)} onKeyDown={e => e.key === "Enter" && tryUnlock()} autoFocus />
+          </div>
+          {error && <div className="error-text">{error}</div>}
+          <div className="btn-row">
+            {hasRoom && <button className="btn secondary" onClick={onCancel}>Cancel</button>}
+            <button className="btn primary" onClick={tryUnlock}>Unlock</button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div style={{ color: "var(--text-muted)" }}>Which roster should this tablet show?</div>
+          <div className="room-choice-row">
+            <button className="room-choice MS" onClick={() => onChoose("MS")}>
+              <span>Middle School</span>
+              <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Torrid · Grades 6–8</span>
+            </button>
+            <button className="room-choice HS" onClick={() => onChoose("HS")}>
+              <span>High School</span>
+              <span style={{ fontSize: 13, color: "var(--text-muted)" }}>The Barn · Grades 9–12</span>
+            </button>
+            <button className="room-choice SUNDAY" onClick={() => onChoose("SUNDAY")}>
+              <span>Sunday Morning</span>
+              <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Everyone, combined</span>
+            </button>
+            <button className="room-choice EVENT" onClick={() => onChoose("EVENT")}>
+              <span>Special Event</span>
+              <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Everyone, custom title</span>
+            </button>
+          </div>
+          {hasRoom && <button className="btn secondary" style={{ width: 280 }} onClick={onCancel}>Cancel</button>}
+        </>
+      )}
+
+      <button className="fab-gear" style={{ position: "fixed", bottom: 22, right: 32 }} onClick={() => setShowDashLogin(true)}>⚙</button>
+
+      {showDashLogin && (
+        <div className="overlay" onClick={() => setShowDashLogin(false)}>
+          <div className="sheet" style={{ maxWidth: 340 }} onClick={e => e.stopPropagation()}>
+            <h2>Dashboard Login</h2>
+            <div className="field">
+              <label>Passcode</label>
+              <input type="password" autoFocus value={dashCode} onChange={e => setDashCode(e.target.value)} onKeyDown={e => e.key === "Enter" && tryDashLogin()} />
+            </div>
+            {dashError && <div className="error-text">{dashError}</div>}
+            <div className="btn-row">
+              <button className="btn secondary" onClick={() => setShowDashLogin(false)}>Cancel</button>
+              <button className="btn primary" onClick={tryDashLogin}>Enter</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// Kiosk — roster + check-in + new student
+// ============================================================================
+function Confetti() {
+  // Same falling-paper mechanic as Intercede's confetti (random size, spin,
+  // duration, and delay per piece, double-rotation fall with a fade at the
+  // end) — just re-colored to this app's own black/white/yellow/red identity
+  // instead of Intercede's palette.
+  const pieces = useMemo(() => Array.from({ length: 38 }, (_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    delay: Math.random() * 2.5,
+    duration: 2.8 + Math.random() * 2,
+    size: 7 + Math.random() * 8,
+    color: ["#FFD400", "#E63946", "#FFFFFF", "#FFB627", "#FF8C61", "#F2B705"][i % 6],
+    rotate: Math.random() * 360
+  })), []);
+  return (
+    <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 150, overflow: "hidden" }}>
+      {pieces.map(p => (
+        <div key={p.id} style={{
+          position: "absolute",
+          left: `${p.x}%`,
+          top: -20,
+          width: p.size,
+          height: p.size * 0.55,
+          background: p.color,
+          borderRadius: 2,
+          transform: `rotate(${p.rotate}deg)`,
+          animation: `confetti-fall ${p.duration}s ${p.delay}s ease-in forwards`,
+          opacity: 0
+        }} />
+      ))}
+    </div>
+  );
+}
+
+function Kiosk({ room, students, attendance, settings, onOpenAdmin, onOpenSetup, flashToast }) {
+  const [showNew, setShowNew] = useState(false);
+  const [showGear, setShowGear] = useState(false);
+  const isCombined = room === "SUNDAY" || room === "EVENT";
+
+  // How many columns actually fit right now, capped by the admin's chosen
+  // maximum. Measured from the real container width (not a CSS breakpoint
+  // guess) so portrait/landscape and different tablet models each land on
+  // however many genuinely fit, never more than the configured ceiling.
+  const maxColumns = settings.maxColumns || 4;
+  const rosterScrollRef = useRef(null);
+  const [columnCount, setColumnCount] = useState(maxColumns);
+  useEffect(() => {
+    const el = rosterScrollRef.current;
+    if (!el) return;
+    const MIN_TILE = 150, GAP = 12;
+    function recompute() {
+      const width = el.clientWidth;
+      const fits = Math.max(1, Math.floor((width + GAP) / (MIN_TILE + GAP)));
+      setColumnCount(Math.min(maxColumns, fits));
+    }
+    recompute();
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(recompute);
+      ro.observe(el);
+      window.addEventListener("orientationchange", recompute);
+      return () => { ro.disconnect(); window.removeEventListener("orientationchange", recompute); };
+    } else {
+      // Extremely old/unusual browser fallback — window resize still
+      // catches orientation changes, just without sub-pixel precision.
+      window.addEventListener("resize", recompute);
+      window.addEventListener("orientationchange", recompute);
+      return () => {
+        window.removeEventListener("resize", recompute);
+        window.removeEventListener("orientationchange", recompute);
+      };
+    }
+  }, [maxColumns]);
+
+  const [pendingQueue, setPendingQueue] = useState(() => loadPendingQueue());
+  useEffect(() => {
+    const tryFlush = () => flushPendingQueue(setPendingQueue);
+    tryFlush(); // try once on mount
+    const interval = setInterval(tryFlush, 15000);
+    window.addEventListener("online", tryFlush);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("online", tryFlush);
+    };
+  }, []);
+
+  // Today's event title/theme lives in the shared settings doc (not
+  // per-device localStorage), so starting an event on one tablet makes it
+  // immediately visible on every other tablet set to Event mode — no
+  // retyping, and no risk of two tablets landing on slightly different
+  // titles that would otherwise get counted as separate sessions.
+  const eventToday = settings.eventToday;
+  const eventIsCurrent = room === "EVENT" && eventToday && eventToday.date === todayStr();
+  const eventTitle = eventIsCurrent ? eventToday.title : null;
+  const eventTheme = eventIsCurrent ? (eventToday.theme || "red") : null;
+
+  const eventLabel = room === "SUNDAY" ? "Sunday Morning" : (room === "EVENT" ? eventTitle : defaultEventForRoom(room));
+
+  // HS and Sunday Morning are always red; MS is always yellow; Events use
+  // whichever preset a leader picked for today (defaulting to red).
+  const activeThemeKey = room === "MS" ? "yellow" : (room === "EVENT" ? (eventTheme || "red") : "red");
+  const activeTheme = THEMES[activeThemeKey] || THEMES.red;
+  const themeStyle = themeToCssVars(activeTheme);
+
+  const roster = useMemo(() => {
+    if (isCombined) return students.filter(s => s.active !== false);
+    return students.filter(s => rosterArray(s).includes(room) && s.active !== false);
+  }, [students, room, isCombined]);
+
+  const today = todayStr();
+  const todaysAttendance = useMemo(() => {
+    if (isCombined) {
+      return new Set(attendance.filter(a => a.date === today && a.event === eventLabel).map(a => a.studentId));
+    }
+    return new Set(attendance.filter(a => a.date === today && a.room === room).map(a => a.studentId));
+  }, [attendance, today, room, isCombined, eventLabel]);
+
+  // last 3 calendar weeks this room has had any activity, for streak dots + alerts
+  // (not meaningful in combined mode, since attendance there is logged under
+  // each student's own MS/HS room — streaks/alerts are shown in MS/HS mode only)
+  const [justChecked, setJustChecked] = useState(new Set());
+  const [pendingCheckIn, setPendingCheckIn] = useState(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+
+  const queuedTodayIds = useMemo(() =>
+    new Set(pendingQueue.filter(q => q.date === today).map(q => q.studentId)),
+    [pendingQueue, today]);
+
+  const filtered = roster.filter(s => !todaysAttendance.has(s.id) && !justChecked.has(s.id) && !queuedTodayIds.has(s.id));
+  const leaderList = filtered.filter(s => s.role === "leader").sort(byLastName);
+  const studentList = filtered.filter(s => s.role !== "leader").sort(byLastName);
+
+  function tapTile(student) {
+    if (todaysAttendance.has(student.id) || justChecked.has(student.id) || queuedTodayIds.has(student.id)) return;
+    setPendingCheckIn(student);
+  }
+
+  function celebrate(student) {
+    if (isBirthdayNearby(student)) {
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 7500);
+      flashToast(`🎂🎂🎂\nHappy Birthday\n${student.name.split(" ")[0]}\n🎉🎉🎉`, 3200);
+      return;
+    }
+    flashToast(`${student.name.split(" ")[0]} checked in ✓`);
+  }
+
+  async function confirmCheckIn(student) {
+    setPendingCheckIn(null);
+    setJustChecked(prev => new Set(prev).add(student.id));
+    if (isCombined) {
+      // A dedicated MS/HS kiosk already only ever logs its own single room.
+      // On a combined kiosk (Sunday/Event) there's no "which room" signal
+      // at all, so someone who belongs to both rosters (e.g. a leader who
+      // covers both groups) is logged under just their first-listed room —
+      // never both — since they're only ever physically in one at a time.
+      const rooms = rosterArray(student);
+      const target = rooms.length ? rooms[0] : room;
+      await writeAttendanceRecord({
+        studentId: student.id, studentName: student.name, room: target,
+        event: eventLabel, date: today, combined: true
+      }, setPendingQueue);
+    } else {
+      await writeAttendanceRecord({
+        studentId: student.id, studentName: student.name, room,
+        event: defaultEventForRoom(room), date: today, combined: false
+      }, setPendingQueue);
+    }
+    celebrate(student);
+  }
+
+  function renderTile(s) {
+    const parts = s.name.trim().split(/\s+/);
+    const firstName = parts[0];
+    const lastName = parts.length > 1 ? parts[parts.length - 1] : null;
+    return (
+      <button key={s.id} onClick={() => tapTile(s)} className="name-tile">
+        <div className="n">{firstName}</div>
+        {lastName && <div className="n">{lastName}</div>}
+      </button>
+    );
+  }
+
+  if (room === "EVENT" && !eventTitle) {
+    return <EventTitlePrompt onSet={(title, themeKey) => {
+      db.collection("settings").doc("adminMeta").set(
+        { eventToday: { title, theme: themeKey, date: todayStr() } },
+        { merge: true }
+      );
+    }} onOpenSetup={onOpenSetup} />;
+  }
+
+  return (
+    <div className="app" style={themeStyle}>
+      {showConfetti && <Confetti />}
+      {pendingQueue.length > 0 && (
+        <div style={{
+          position: "fixed", bottom: 90, left: 32, background: "var(--accent-coral)", color: "#fff",
+          padding: "10px 18px", borderRadius: 999, fontSize: 13, fontWeight: 700, zIndex: 60,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.35)"
+        }}>
+          ☁️ {pendingQueue.length} check-in{pendingQueue.length !== 1 ? "s" : ""} waiting to sync
+        </div>
+      )}
+      <div className="kiosk-header">
+        <div className="room-name">
+          {room === "MS" ? "Torrid" : room === "HS" ? "The Barn" : room === "SUNDAY" ? "Sunday Morning" : eventTitle}
+          <span className={`badge ${room}`}>
+            {room === "MS" ? "Middle School" : room === "HS" ? "High School" : room === "SUNDAY" ? "Everyone" : "Special Event"}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div className="date">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</div>
+          <button className="btn primary" style={{ flex: "none", padding: "10px 20px", fontSize: 15 }} onClick={() => setShowNew(true)}>+ I'm New Here!</button>
+        </div>
+      </div>
+
+      <div className="roster-scroll" ref={rosterScrollRef} style={{ "--kiosk-columns": columnCount }}>
+        {studentList.length === 0 && leaderList.length === 0 && <div className="empty-state">No one to check in yet — tap "I'm New Here!" above to sign up.</div>}
+        {studentList.length > 0 && (
+          <div className="grade-group">
+            <div className="tile-grid">
+              {studentList.map(renderTile)}
+            </div>
+          </div>
+        )}
+        {leaderList.length > 0 && (
+          <div className="grade-group">
+            <div className="grade-label">Leaders</div>
+            <div className="tile-grid">
+              {leaderList.map(renderTile)}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="fab-row" style={{ justifyContent: "flex-end" }}>
+        <button className="fab-gear" onClick={() => setShowGear(true)}>⚙</button>
+      </div>
+
+      {showNew && (room === "EVENT"
+        ? <NewGuestForm eventLabel={eventLabel} onClose={() => setShowNew(false)}
+                        onDone={(name) => { setShowNew(false); flashToast(`Welcome, ${name.split(" ")[0]}! Checked in ✓`); }} />
+        : <NewStudentForm room={room} eventLabel={eventLabel} isCombined={isCombined} onClose={() => setShowNew(false)}
+                        onDone={(name) => { setShowNew(false); flashToast(`Welcome, ${name.split(" ")[0]}! Checked in ✓`); }} />
+      )}
+
+      {showGear && <GearMenu onClose={() => setShowGear(false)} onAdmin={(level) => { setShowGear(false); onOpenAdmin(level); }}
+                    onChangeRoom={() => { setShowGear(false); onOpenSetup(); }} adminPasscode={ADMIN_PASSCODE} leaderPasscode={LEADER_PASSCODE}
+                    room={room} onResetEventTitle={() => { setShowGear(false); db.collection("settings").doc("adminMeta").set({ eventToday: null }, { merge: true }); }} />}
+
+      {pendingCheckIn && (
+        <ConfirmDialog
+          title="Is this you?"
+          message={pendingCheckIn.name}
+          confirmLabel="Yes, check me in"
+          cancelLabel="Not me"
+          emphasizeMessage
+          onConfirm={() => confirmCheckIn(pendingCheckIn)}
+          onCancel={() => setPendingCheckIn(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Reusable styled confirmation dialog — replaces window.confirm() everywhere,
+// since the native browser popup looked too much like a generic OS alert.
+// Big primary confirm button on top, small plain-text cancel centered below it.
+// emphasizeMessage makes the message the single biggest, boldest thing in the
+// box (shrinking the title into a small lead-in line above it) — used for the
+// check-in dialog specifically, so a wrong name is hard to miss.
+function ConfirmDialog({ title, message, confirmLabel = "Confirm", cancelLabel = "Cancel", danger = false, emphasizeMessage = false, onConfirm, onCancel }) {
+  return (
+    <div className="overlay" onClick={onCancel}>
+      <div className="sheet" style={{ maxWidth: 380, textAlign: "center" }} onClick={e => e.stopPropagation()}>
+        {title && (
+          <div style={emphasizeMessage
+            ? { fontSize: 14, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text-muted)", marginBottom: 10 }
+            : { fontSize: 24, fontWeight: 700, marginBottom: 10 }}>
+            {title}
+          </div>
+        )}
+        <div style={emphasizeMessage
+          ? { marginBottom: 28, fontSize: 36, fontWeight: 800, color: "var(--text-light)", lineHeight: 1.15, wordBreak: "break-word" }
+          : { marginBottom: 26, color: "var(--text-muted)", fontSize: 14 }}>
+          {message}
+        </div>
+        <button className={`btn ${danger ? "danger" : "primary"}`} style={{ width: "100%", padding: "18px", fontSize: 18, fontWeight: 700 }} onClick={onConfirm}>
+          {confirmLabel}
+        </button>
+        <button onClick={onCancel} style={{
+          display: "block", margin: "16px auto 0", background: "none", border: "none",
+          color: "var(--text-muted)", fontSize: 14, padding: "6px 14px", cursor: "pointer"
+        }}>
+          {cancelLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EventTitlePrompt({ onSet, onOpenSetup }) {
+  const [title, setTitle] = useState("");
+  const [theme, setTheme] = useState("red");
+  const themeKeys = Object.keys(THEMES);
+  return (
+    <div className="setup-screen">
+      <div className="title">Name Today's Event</div>
+      <div style={{ width: 340 }}>
+        <div className="field">
+          <label>Event title</label>
+          <input placeholder="e.g. Fall Kickoff, Lock-In…" value={title} onChange={e => setTitle(e.target.value)}
+                 onKeyDown={e => e.key === "Enter" && title.trim() && onSet(title.trim(), theme)} autoFocus />
+        </div>
+        <div className="field">
+          <label>Color theme</label>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {themeKeys.map(key => (
+              <button key={key} onClick={() => setTheme(key)}
+                      title={THEMES[key].label}
+                      style={{
+                        width: 44, height: 44, borderRadius: "50%", border: theme === key ? "3px solid var(--text-light)" : "3px solid transparent",
+                        background: THEMES[key].swatch, cursor: "pointer", boxShadow: theme === key ? "0 0 0 2px rgba(0,0,0,0.4)" : "none"
+                      }} />
+            ))}
+          </div>
+          <div style={{ marginTop: 8, fontSize: 13, color: "var(--text-muted)" }}>{THEMES[theme].label}</div>
+        </div>
+        <div className="btn-row">
+          <button className="btn secondary" onClick={onOpenSetup}>Change Tablet Setting</button>
+          <button className="btn primary" disabled={!title.trim()} onClick={() => onSet(title.trim(), theme)}>Start Check-In</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GearMenu({ onClose, onAdmin, onChangeRoom, adminPasscode, leaderPasscode, room, onResetEventTitle }) {
+  const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+  function submit() {
+    if (code === adminPasscode) { onAdmin("admin"); }
+    else if (code === leaderPasscode) { onAdmin("leader"); }
+    else setError("Wrong passcode.");
+  }
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="sheet" onClick={e => e.stopPropagation()} style={{ maxWidth: 340 }}>
+        <h2>Leader Access</h2>
+        <div className="field">
+          <label>Passcode</label>
+          <input type="password" autoFocus value={code} onChange={e => setCode(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} />
+        </div>
+        {error && <div className="error-text">{error}</div>}
+        <div className="btn-row">
+          <button className="btn secondary" onClick={onClose}>Cancel</button>
+          <button className="btn primary" onClick={submit}>Enter</button>
+        </div>
+        <button className="btn secondary" style={{ width: "100%", marginTop: 10 }} onClick={onChangeRoom}>Change tablet's room</button>
+        {room === "EVENT" && <button className="btn secondary" style={{ width: "100%", marginTop: 10 }} onClick={onResetEventTitle}>Change today's event title</button>}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// New Student form (self-serve)
+// ============================================================================
+function NewStudentForm({ room, eventLabel, isCombined, onClose, onDone }) {
+  const [form, setForm] = useState({
+    name: "", birthday: "", grade: room === "MS" ? "6" : (room === "HS" ? "9" : "6"),
+    phone: "", email: "",
+    ecRelationship: "", ecName: "", ecPhone: "", ecEmail: ""
+  });
+  const [error, setError] = useState("");
+  const gradeOptions = isCombined ? ["6", "7", "8", "9", "10", "11", "12"] : (room === "MS" ? ["6", "7", "8"] : ["9", "10", "11", "12"]);
+
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
+
+  async function submit() {
+    if (!form.name.trim() || !form.birthday || !form.grade) return setError("Name, birthday, and grade are required.");
+    if (!form.ecRelationship.trim() || !form.ecName.trim() || !form.ecPhone.trim())
+      return setError("Emergency contact relationship, name, and phone are required.");
+
+    const grade = parseInt(form.grade, 10);
+    const studentRoom = grade <= 8 ? "MS" : "HS"; // attendance.room must always be MS/HS, never SUNDAY/EVENT
+    const roster = [studentRoom];
+    const docRef = await db.collection("students").add({
+      name: form.name.trim(), birthday: form.birthday, grade, roster, role: "student",
+      phone: form.phone.trim(), email: form.email.trim(), active: true,
+      emergency: { relationship: form.ecRelationship.trim(), name: form.ecName.trim(), phone: form.ecPhone.trim(), email: form.ecEmail.trim() },
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    // auto check-in for today, using the same event label the kiosk itself
+    // is showing (so a Special Event's custom title carries through
+    // correctly instead of falling back to a generic wrong value)
+    await db.collection("attendance").add({
+      studentId: docRef.id, studentName: form.name.trim(), room: studentRoom,
+      event: eventLabel, date: todayStr(), combined: isCombined,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    onDone(form.name.trim());
+  }
+
+  return (
+    <div className="overlay">
+      <div className="sheet">
+        <h2>New Student</h2>
+        <div className="sub">Welcome! Fill this out and you're checked in for today.</div>
+
+        <div className="section-title">About you</div>
+        <div className="field"><label>Full name *</label><input value={form.name} onChange={e => set("name", e.target.value)} autoFocus /></div>
+        <div className="field"><label>Birthday *</label><input type="date" value={form.birthday} onChange={e => set("birthday", e.target.value)} /></div>
+        <div className="field"><label>Grade *</label>
+          <select value={form.grade} onChange={e => set("grade", e.target.value)}>
+            {gradeOptions.map(g => <option key={g} value={g}>{g}th grade</option>)}
+          </select>
+        </div>
+        <div className="field-row">
+          <div className="field"><label>Phone (optional)</label><input type="tel" value={form.phone} onChange={e => set("phone", e.target.value)} /></div>
+          <div className="field"><label>Email (optional)</label><input type="email" value={form.email} onChange={e => set("email", e.target.value)} /></div>
+        </div>
+
+        <div className="section-title">Emergency contact</div>
+        <div className="field-row">
+          <div className="field"><label>Relationship *</label><input placeholder="Mom, Dad, Guardian…" value={form.ecRelationship} onChange={e => set("ecRelationship", e.target.value)} /></div>
+          <div className="field"><label>Name *</label><input value={form.ecName} onChange={e => set("ecName", e.target.value)} /></div>
+        </div>
+        <div className="field-row">
+          <div className="field"><label>Phone *</label><input type="tel" value={form.ecPhone} onChange={e => set("ecPhone", e.target.value)} /></div>
+          <div className="field"><label>Email (optional)</label><input type="email" value={form.ecEmail} onChange={e => set("ecEmail", e.target.value)} /></div>
+        </div>
+
+        {error && <div className="error-text">{error}</div>}
+        <div className="btn-row">
+          <button className="btn secondary" onClick={onClose}>Cancel</button>
+          <button className="btn primary" onClick={submit}>Submit & Check In</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// A deliberately short form for Special Event walk-ins who may never come
+// back — captures just a name, a rough MS/HS age group (so attendance
+// counts land somewhere valid), and emergency contact info. Writes to
+// `eventGuests`, NOT `students` — this never touches the real roster.
+// An admin can later "promote" a guest into a full roster entry by hand
+// if they turn out to be a regular.
+function NewGuestForm({ eventLabel, onClose, onDone }) {
+  const [form, setForm] = useState({
+    name: "",
+    ecRelationship: "", ecName: "", ecPhone: ""
+  });
+  const [error, setError] = useState("");
+
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
+
+  async function submit() {
+    if (!form.name.trim()) return setError("Name is required.");
+    if (!form.ecRelationship.trim() || !form.ecName.trim() || !form.ecPhone.trim())
+      return setError("Emergency contact relationship, name, and phone are required.");
+
+    const guestRef = await db.collection("eventGuests").add({
+      name: form.name.trim(),
+      emergency: { relationship: form.ecRelationship.trim(), name: form.ecName.trim(), phone: form.ecPhone.trim() },
+      eventTitle: eventLabel, date: todayStr(),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    // "GUEST" isn't MS or HS — Events are never split by room in any
+    // report, so there's nothing to gain by guessing an age group, and
+    // this is more honest than silently picking one.
+    await db.collection("attendance").add({
+      studentId: guestRef.id, studentName: form.name.trim(), room: "GUEST",
+      event: eventLabel, date: todayStr(), combined: true, isGuest: true,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    onDone(form.name.trim());
+  }
+
+  return (
+    <div className="overlay">
+      <div className="sheet">
+        <h2>New Guest</h2>
+        <div className="sub">Welcome! Just a couple quick things and you're checked in.</div>
+
+        <div className="field"><label>Full name *</label><input value={form.name} onChange={e => set("name", e.target.value)} autoFocus /></div>
+
+        <div className="section-title">Emergency contact</div>
+        <div className="field-row">
+          <div className="field"><label>Relationship *</label><input placeholder="Mom, Dad, Guardian…" value={form.ecRelationship} onChange={e => set("ecRelationship", e.target.value)} /></div>
+          <div className="field"><label>Name *</label><input value={form.ecName} onChange={e => set("ecName", e.target.value)} /></div>
+        </div>
+        <div className="field">
+          <label>Phone *</label><input type="tel" value={form.ecPhone} onChange={e => set("ecPhone", e.target.value)} />
+        </div>
+
+        {error && <div className="error-text">{error}</div>}
+        <div className="btn-row">
+          <button className="btn secondary" onClick={onClose}>Cancel</button>
+          <button className="btn primary" onClick={submit}>Submit & Check In</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Admin — passcode gate, then tabs
+// ============================================================================
+function Admin({ students, attendance, guests, settings, initialLevel, onClose, flashToast }) {
+  const [level] = useState(initialLevel === "admin" ? "admin" : "leader"); // matched in the kiosk gear menu already
+  const [tab, setTab] = useState(level === "admin" ? "roster" : "checkin");
+  const [profileStudent, setProfileStudent] = useState(null);
+  const signupsClearedAt = settings.signupsClearedAt || null;
+
+  const newSignupCount = useMemo(() => {
+    const clearedMs = signupsClearedAt ? signupsClearedAt.toMillis() : 0;
+    return students.filter(s => {
+      const createdMs = s.createdAt ? s.createdAt.toMillis() : Date.now(); // pending local write — treat as newest
+      return createdMs > clearedMs;
+    }).length;
+  }, [students, signupsClearedAt]);
+
+  async function reviewSignups() {
+    setTab("signups");
+    await db.collection("settings").doc("adminMeta").set(
+      { signupsClearedAt: firebase.firestore.FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+  }
+
+  const tabs = level === "admin"
+    ? [["roster", "Roster"], ["checkin", "Manual Check-In"], ["livelist", "Live List"], ["signups", "New Signups"], ["guests", "Guests"], ["trends", "Trends"], ["alerts", "Alerts"], ["sessions", "Sessions"], ["promote", "Promote"]]
+    : [["checkin", "Manual Check-In"], ["livelist", "Live List"], ["signups", "New Signups"], ["guests", "Guests"]];
+
+  return (
+    <div className="app">
+      <div className="admin-header">
+        <h2 style={{ margin: 0 }}>{level === "admin" ? "Admin" : "Leader"} Dashboard</h2>
+        <button className="btn secondary" style={{ flex: "none", padding: "10px 18px" }} onClick={onClose}>Close</button>
+      </div>
+      {newSignupCount > 0 && (
+        <button onClick={reviewSignups} style={{
+          display: "block", width: "100%", textAlign: "left", padding: "14px 28px",
+          background: "var(--accent-tint-18)", color: "var(--accent-readable)", border: "none",
+          borderBottom: "1px solid var(--border-soft)", fontWeight: 700, fontSize: 15, cursor: "pointer"
+        }}>
+          🎉 {newSignupCount} new signup{newSignupCount !== 1 ? "s" : ""} — tap to review
+        </button>
+      )}
+      <div className="admin-tabs">
+        {tabs.map(([id, label]) => (
+          <button key={id} className={`admin-tab ${tab === id ? "active" : ""}`} onClick={() => setTab(id)}>{label}</button>
+        ))}
+      </div>
+      <div className="admin-body">
+        {tab === "roster" && <RosterTab students={students} attendance={attendance} onOpenProfile={setProfileStudent} flashToast={flashToast} settings={settings} />}
+        {tab === "checkin" && <ManualCheckinTab students={students} attendance={attendance} flashToast={flashToast} />}
+        {tab === "livelist" && <LiveListTab students={students} attendance={attendance} flashToast={flashToast} />}
+        {tab === "signups" && <SignupsTab students={students} onOpenProfile={setProfileStudent} />}
+        {tab === "guests" && <GuestsTab guests={guests} flashToast={flashToast} />}
+        {tab === "trends" && <TrendsTab attendance={attendance} students={students} />}
+        {tab === "alerts" && <AlertsTab students={students} attendance={attendance} onOpenProfile={setProfileStudent} />}
+        {tab === "sessions" && <SessionsTab attendance={attendance} students={students} flashToast={flashToast} />}
+        {tab === "promote" && <PromoteTab students={students} flashToast={flashToast} />}
+      </div>
+      {profileStudent && <ProfileModal student={profileStudent} attendance={attendance} onClose={() => setProfileStudent(null)} flashToast={flashToast} />}
+    </div>
+  );
+}
+
+function RosterTab({ students, attendance, onOpenProfile, flashToast, settings }) {
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [showAdd, setShowAdd] = useState(false);
+  const maxColumns = settings.maxColumns || 4;
+  const list = students
+    .filter(s => filter === "all" ? true : filter === "inactive" ? s.active === false : (rosterArray(s).includes(filter) && s.active !== false))
+    .filter(s => s.name.toLowerCase().includes(query.toLowerCase()))
+    .sort(byLastName);
+
+  async function setMaxColumns(n) {
+    await db.collection("settings").doc("adminMeta").set({ maxColumns: n }, { merge: true });
+  }
+
+  return (
+    <>
+      <div className="chart-card" style={{ maxWidth: 500, marginBottom: 16 }}>
+        <h3 style={{ marginBottom: 4 }}>Kiosk Card Layout</h3>
+        <div className="sub" style={{ marginBottom: 12 }}>
+          Widest column count on the check-in screen. It'll show fewer automatically on a narrower screen or in portrait — this just sets the ceiling.
+        </div>
+        <div className="btn-row">
+          {[2, 3, 4].map(n => (
+            <button key={n} className={`btn ${maxColumns === n ? "primary" : "secondary"}`} onClick={() => setMaxColumns(n)}>
+              {n} across
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-start", maxWidth: 500, marginBottom: 4, flexWrap: "wrap" }}>
+        <div className="field" style={{ flex: 1, minWidth: 180 }}>
+          <input placeholder="Search students…" value={query} onChange={e => setQuery(e.target.value)}
+                 style={{ width: "100%", padding: 12, background: "var(--bg-panel)", border: "1px solid var(--border-soft)", borderRadius: 10, color: "var(--text-light)" }} />
+        </div>
+        <button className="btn primary" style={{ flex: "none", padding: "12px 16px" }} onClick={() => setShowAdd(true)}>+ Add Student</button>
+      </div>
+      <div className="btn-row" style={{ maxWidth: 400, marginBottom: 16 }}>
+        {["all", "MS", "HS", "inactive"].map(f => (
+          <button key={f} className={`btn ${filter === f ? "primary" : "secondary"}`} style={{ flex: 1, padding: "8px 4px", fontSize: 13 }} onClick={() => setFilter(f)}>
+            {f === "all" ? "All" : f === "inactive" ? "Inactive" : f}
+          </button>
+        ))}
+      </div>
+      <div className="row-list">
+        {list.map(s => {
+          const rosterLabel = rosterArray(s).join(" + ") || "—";
+          const rosterClass = s.active === false ? "inactive" : (rosterArray(s).length > 1 ? "" : rosterArray(s)[0]);
+          return (
+            <button key={s.id} className="row-item" style={{ width: "100%", border: "1px solid var(--border-soft)", textAlign: "left" }} onClick={() => onOpenProfile(s)}>
+              <div>
+                <div className="rn">{s.name}</div>
+                <div className="rs">{s.role === "leader" ? "Leader" : `Grade ${s.grade}`} {s.active === false ? "· Inactive" : ""}</div>
+              </div>
+              <span className={`pill ${rosterClass}`} style={rosterClass === "" ? { background: "var(--accent-tint-18)", color: "var(--accent)" } : undefined}>
+                {s.active === false ? "Inactive" : rosterLabel}
+              </span>
+            </button>
+          );
+        })}
+        {list.length === 0 && <div className="empty-state">No students match.</div>}
+      </div>
+      {showAdd && <AdminAddStudentForm onClose={() => setShowAdd(false)} onDone={() => setShowAdd(false)} />}
+    </>
+  );
+}
+
+// Admin-only "add student" — unlike the kiosk self-serve form, this allows
+// grade 5 (for incoming 5th graders joining over the summer) and does NOT
+// auto check them in, since they're being added ahead of time, not in-room.
+function AdminAddStudentForm({ onClose, onDone }) {
+  const [form, setForm] = useState({
+    name: "", birthday: "", grade: "5",
+    phone: "", email: "",
+    ecRelationship: "", ecName: "", ecPhone: "", ecEmail: ""
+  });
+  const [error, setError] = useState("");
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
+
+  async function submit() {
+    if (!form.name.trim() || !form.grade) return setError("Name and grade are required.");
+    if (!form.ecRelationship.trim() || !form.ecName.trim() || !form.ecPhone.trim())
+      return setError("Emergency contact relationship, name, and phone are required.");
+    const grade = parseInt(form.grade, 10);
+    const roster = [grade <= 8 ? "MS" : "HS"];
+    await db.collection("students").add({
+      name: form.name.trim(), birthday: form.birthday, grade, roster, role: "student",
+      phone: form.phone.trim(), email: form.email.trim(), active: true,
+      emergency: { relationship: form.ecRelationship.trim(), name: form.ecName.trim(), phone: form.ecPhone.trim(), email: form.ecEmail.trim() },
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    onDone();
+  }
+
+  return (
+    <div className="overlay">
+      <div className="sheet">
+        <h2>Add Student</h2>
+        <div className="sub">Manual add — use this for incoming 5th graders or anyone else joining outside a room check-in.</div>
+        <div className="section-title">Student</div>
+        <div className="field"><label>Full name *</label><input value={form.name} onChange={e => set("name", e.target.value)} autoFocus /></div>
+        <div className="field"><label>Birthday</label><input type="date" value={form.birthday} onChange={e => set("birthday", e.target.value)} /></div>
+        <div className="field"><label>Grade *</label>
+          <select value={form.grade} onChange={e => set("grade", e.target.value)}>
+            {["5", "6", "7", "8", "9", "10", "11", "12"].map(g => <option key={g} value={g}>{g}th grade</option>)}
+          </select>
+        </div>
+        <div className="field-row">
+          <div className="field"><label>Phone (optional)</label><input type="tel" value={form.phone} onChange={e => set("phone", e.target.value)} /></div>
+          <div className="field"><label>Email (optional)</label><input type="email" value={form.email} onChange={e => set("email", e.target.value)} /></div>
+        </div>
+        <div className="section-title">Emergency contact</div>
+        <div className="field-row">
+          <div className="field"><label>Relationship *</label><input value={form.ecRelationship} onChange={e => set("ecRelationship", e.target.value)} /></div>
+          <div className="field"><label>Name *</label><input value={form.ecName} onChange={e => set("ecName", e.target.value)} /></div>
+        </div>
+        <div className="field-row">
+          <div className="field"><label>Phone *</label><input type="tel" value={form.ecPhone} onChange={e => set("ecPhone", e.target.value)} /></div>
+          <div className="field"><label>Email (optional)</label><input type="email" value={form.ecEmail} onChange={e => set("ecEmail", e.target.value)} /></div>
+        </div>
+        {error && <div className="error-text">{error}</div>}
+        <div className="btn-row">
+          <button className="btn secondary" onClick={onClose}>Cancel</button>
+          <button className="btn primary" onClick={submit}>Add Student</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// A plain, one-name-per-line list of everyone checked in TODAY, filterable
+// by MS / HS / Events (Sunday or Special Event) / All, with a toggle for
+// whether leaders are included. It's read-only text meant for selecting
+// and pasting into another system — updates live since it's derived
+// straight from the same real-time `attendance`/`students` data as
+// everywhere else in the app, no extra plumbing needed.
+function LiveListTab({ students, attendance, flashToast }) {
+  const [category, setCategory] = useState("all"); // ms | hs | events | all
+  const [includeLeaders, setIncludeLeaders] = useState(true);
+
+  const today = todayStr();
+  const peopleList = useMemo(() => {
+    const todaysRecords = attendance.filter(a => a.date === today);
+    const filtered = todaysRecords.filter(a => {
+      if (category === "ms") return a.room === "MS";
+      if (category === "hs") return a.room === "HS";
+      if (category === "events") return isRecordCombined(a);
+      return true; // all
+    });
+    const byId = {};
+    filtered.forEach(a => {
+      if (byId[a.studentId]) return;
+      // Guests aren't in the roster at all — fall back to the name already
+      // stored on the attendance record itself so they still show up here.
+      const rosterMatch = students.find(s => s.id === a.studentId);
+      byId[a.studentId] = rosterMatch || { id: a.studentId, name: a.studentName, role: a.isGuest ? "guest" : "student" };
+    });
+    return Object.values(byId)
+      .filter(s => includeLeaders || s.role !== "leader")
+      .sort(byLastName);
+  }, [attendance, students, today, category, includeLeaders]);
+
+  const namesText = peopleList.map(s => s.name).join("\n");
+
+  async function copyToClipboard() {
+    try {
+      await navigator.clipboard.writeText(namesText);
+      flashToast("Copied to clipboard ✓");
+    } catch (e) {
+      window.alert("Couldn't copy automatically — select the text below and copy manually.");
+    }
+  }
+
+  const categoryLabels = { ms: "Middle School", hs: "High School", events: "Events (Sunday / Special Event)", all: "Everyone" };
+
+  return (
+    <>
+      <div className="sub" style={{ marginBottom: 16 }}>
+        Everyone checked in today ({fmtDate(today)}), one name per line — select and copy, or use the button below.
+      </div>
+      <div className="btn-row" style={{ maxWidth: 500, marginBottom: 12 }}>
+        {["ms", "hs", "events", "all"].map(c => (
+          <button key={c} className={`btn ${category === c ? "primary" : "secondary"}`} style={{ flex: 1, padding: "8px 4px", fontSize: 13 }} onClick={() => setCategory(c)}>
+            {c === "ms" ? "MS" : c === "hs" ? "HS" : c === "events" ? "Events" : "All"}
+          </button>
+        ))}
+      </div>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, fontSize: 14, color: "var(--text-muted)", cursor: "pointer" }}>
+        <input type="checkbox" checked={includeLeaders} onChange={e => setIncludeLeaders(e.target.checked)} />
+        Include leaders
+      </label>
+      <div className="stat-grid" style={{ maxWidth: 300, marginBottom: 16 }}>
+        <div className="stat-card"><div className="num">{peopleList.length}</div><div className="lbl">{categoryLabels[category]}</div></div>
+      </div>
+      <textarea
+        readOnly
+        value={namesText}
+        placeholder="No one checked in yet for this list."
+        style={{
+          width: "100%", minHeight: 260, padding: 14, background: "var(--bg-panel)",
+          border: "1px solid var(--border-soft)", borderRadius: 10, color: "var(--text-light)",
+          fontSize: 15, lineHeight: 1.6, fontFamily: "'IBM Plex Mono', monospace", resize: "vertical"
+        }}
+      />
+      <div className="btn-row" style={{ maxWidth: 300, marginTop: 12 }}>
+        <button className="btn primary" onClick={copyToClipboard} disabled={peopleList.length === 0}>Copy to Clipboard</button>
+      </div>
+    </>
+  );
+}
+
+function ManualCheckinTab({ students, attendance, flashToast }) {
+  const [query, setQuery] = useState("");
+  const [pendingUndo, setPendingUndo] = useState(null); // { student, room, recordId }
+  const today = todayStr();
+  const list = students.filter(s => s.active !== false && s.name.toLowerCase().includes(query.toLowerCase()))
+    .sort(byLastName);
+
+  async function checkIn(s, targetRoom) {
+    const already = attendance.some(a => a.studentId === s.id && a.date === today && a.room === targetRoom);
+    if (already) return flashToast(`${s.name} already checked in today.`);
+    await db.collection("attendance").add({
+      studentId: s.id, studentName: s.name, room: targetRoom,
+      event: defaultEventForRoom(targetRoom), date: today, combined: false,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    flashToast(`Checked in ${s.name} ✓`);
+  }
+
+  function askUndo(s, targetRoom) {
+    const record = attendance.find(a => a.studentId === s.id && a.date === today && a.room === targetRoom);
+    if (!record) return;
+    setPendingUndo({ student: s, room: targetRoom, recordId: record.id });
+  }
+
+  async function confirmUndo() {
+    const { student, recordId } = pendingUndo;
+    setPendingUndo(null);
+    await db.collection("attendance").doc(recordId).delete();
+    flashToast(`Undid check-in for ${student.name}.`);
+  }
+
+  return (
+    <>
+      <div className="field" style={{ maxWidth: 400 }}>
+        <input placeholder="Search to check someone in…" value={query} onChange={e => setQuery(e.target.value)}
+               style={{ width: "100%", padding: 12, background: "var(--bg-panel)", border: "1px solid var(--border-soft)", borderRadius: 10, color: "var(--text-light)" }} />
+      </div>
+      <div className="row-list" style={{ marginTop: 16 }}>
+        {list.map(s => {
+          const rosters = rosterArray(s);
+          return (
+            <div key={s.id} className="row-item">
+              <div><div className="rn">{s.name}</div><div className="rs">{s.role === "leader" ? "Leader" : `Grade ${s.grade}`} · {rosters.join(" + ")}</div></div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {rosters.map(r => {
+                  const already = attendance.some(a => a.studentId === s.id && a.date === today && a.room === r);
+                  return (
+                    <button key={r} className={`btn ${already ? "secondary" : "primary"}`} style={{ flex: "none", padding: "8px 14px" }}
+                            onClick={() => already ? askUndo(s, r) : checkIn(s, r)}>
+                      {already ? `${r} ✓ — Undo` : rosters.length > 1 ? `Check in (${r})` : "Check in"}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {pendingUndo && (
+        <ConfirmDialog
+          title="Undo this check-in?"
+          message={`${pendingUndo.student.name} — ${pendingUndo.room}`}
+          confirmLabel="Yes, undo it"
+          cancelLabel="Never mind"
+          danger
+          onConfirm={confirmUndo}
+          onCancel={() => setPendingUndo(null)}
+        />
+      )}
+    </>
+  );
+}
+
+function SignupsTab({ students, onOpenProfile }) {
+  const recent = [...students].filter(s => s.createdAt).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).slice(0, 30);
+  return (
+    <div className="row-list">
+      {recent.map(s => (
+        <button key={s.id} className="row-item" style={{ width: "100%", border: "1px solid var(--border-soft)", textAlign: "left" }} onClick={() => onOpenProfile(s)}>
+          <div>
+            <div className="rn">{s.name}</div>
+            <div className="rs">{s.role === "leader" ? "Leader" : `Grade ${s.grade}`} · {rosterArray(s).join(" + ")}</div>
+          </div>
+          <span className={`pill ${rosterArray(s).length > 1 ? "" : rosterArray(s)[0]}`} style={rosterArray(s).length > 1 ? { background: "var(--accent-tint-18)", color: "var(--accent)" } : undefined}>
+            {rosterArray(s).join(" + ")}
+          </span>
+        </button>
+      ))}
+      {recent.length === 0 && <div className="empty-state">No new signups yet.</div>}
+    </div>
+  );
+}
+
+function AlertsTab({ students, attendance, onOpenProfile }) {
+  const msWeeks = recentActiveWeeksForRoom(attendance, "MS", CONSECUTIVE_MISS_ALERT);
+  const hsWeeks = recentActiveWeeksForRoom(attendance, "HS", CONSECUTIVE_MISS_ALERT);
+
+  const atRisk = students.filter(s => {
+    if (s.active === false) return false;
+    const rosters = rosterArray(s);
+    if (rosters.length === 0) return false;
+    return rosters.every(r => {
+      const weeks = r === "MS" ? msWeeks : hsWeeks;
+      if (weeks.length < CONSECUTIVE_MISS_ALERT) return false;
+      return missedAllWeeks(attendance, s.id, weeks);
+    });
+  });
+
+  return (
+    <>
+      <div className="sub" style={{ marginBottom: 16 }}>Missed their last {CONSECUTIVE_MISS_ALERT} weeks in a row (Sunday or Wednesday attendance either one counts as present that week).</div>
+      <div className="row-list">
+        {atRisk.map(s => (
+          <button key={s.id} className="row-item" style={{ width: "100%", border: "1px solid var(--accent-coral)", textAlign: "left" }} onClick={() => onOpenProfile(s)}>
+            <div><div className="rn">{s.name}</div><div className="rs">{s.role === "leader" ? "Leader" : `Grade ${s.grade}`}</div></div>
+            <span className="pill" style={{ background: "var(--danger-tint-18)", color: "var(--accent-coral)" }}>{rosterArray(s).join(" + ")}</span>
+          </button>
+        ))}
+        {atRisk.length === 0 && <div className="empty-state">Nobody's currently flagged. 🎉</div>}
+      </div>
+    </>
+  );
+}
+
+// Groups attendance by (date, event) — a "session" — so a whole test
+// session can be wiped out in one action without touching real stats
+// from other days/events.
+function SessionsTab({ attendance, students, flashToast }) {
+  const [pendingDelete, setPendingDelete] = useState(null); // { key, date, event, ids, count }
+  const [openSession, setOpenSession] = useState(null); // { date, event }
+  const [deleting, setDeleting] = useState(false);
+  const [pendingResetToday, setPendingResetToday] = useState(false);
+  const [pendingWipeAll, setPendingWipeAll] = useState(false);
+  const [wiping, setWiping] = useState(false);
+
+  const sessions = useMemo(() => {
+    const map = {};
+    attendance.forEach(a => {
+      const split = !isRecordCombined(a);
+      const key = split ? (a.date + "|" + a.event + "|" + a.room) : (a.date + "|" + a.event);
+      if (!map[key]) map[key] = { key, date: a.date, event: a.event, room: split ? a.room : null, ids: [], studentIds: new Set() };
+      map[key].ids.push(a.id);
+      map[key].studentIds.add(a.studentId);
+    });
+    return Object.values(map)
+      .map(s => ({ ...s, count: s.studentIds.size }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [attendance]);
+
+  const todayIds = attendance.filter(a => a.date === todayStr()).map(a => a.id);
+  const allIds = attendance.map(a => a.id);
+
+  // Firestore batches cap at 500 operations, so chunk large deletes.
+  async function deleteAttendanceRecords(ids) {
+    const chunkSize = 450;
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      const chunk = ids.slice(i, i + chunkSize);
+      const batch = db.batch();
+      chunk.forEach(id => batch.delete(db.collection("attendance").doc(id)));
+      await batch.commit();
+    }
+  }
+
+  async function confirmResetToday() {
+    setPendingResetToday(false);
+    setWiping(true);
+    try {
+      await deleteAttendanceRecords(todayIds);
+      flashToast(`Cleared today's data — ${todayIds.length} check-in${todayIds.length !== 1 ? "s" : ""} removed.`);
+    } catch (e) {
+      window.alert("Reset failed: " + e.message);
+    }
+    setWiping(false);
+  }
+
+  async function confirmWipeAll() {
+    setPendingWipeAll(false);
+    setWiping(true);
+    try {
+      await deleteAttendanceRecords(allIds);
+      flashToast(`Wiped all attendance data — ${allIds.length} record${allIds.length !== 1 ? "s" : ""} removed. Ready for launch.`);
+    } catch (e) {
+      window.alert("Wipe failed: " + e.message);
+    }
+    setWiping(false);
+  }
+
+  async function confirmDelete() {
+    const session = pendingDelete;
+    setPendingDelete(null);
+    setDeleting(true);
+    try {
+      const batch = db.batch();
+      session.ids.forEach(id => batch.delete(db.collection("attendance").doc(id)));
+      await batch.commit();
+      flashToast(`Deleted "${sessionLabel(session)}" (${fmtDate(session.date)}) — ${session.count} check-in${session.count !== 1 ? "s" : ""} removed.`);
+    } catch (e) {
+      window.alert("Delete failed: " + e.message);
+    }
+    setDeleting(false);
+  }
+
+  return (
+    <>
+      <div className="sub" style={{ marginBottom: 16 }}>
+        Tap a session to see who attended, add someone who forgot to check in, or remove someone added by mistake. Delete Session removes the whole thing — handy for clearing out test data. Both can't be undone.
+      </div>
+      <div className="row-list">
+        {sessions.map(s => (
+          <div key={s.key} className="row-item" style={{ paddingRight: 10 }}>
+            <button onClick={() => setOpenSession(s)} style={{
+              background: "none", border: "none", textAlign: "left", cursor: "pointer", flex: 1, padding: 0, color: "var(--text-light)"
+            }}>
+              <div className="rn">{sessionLabel(s)} — {fmtDate(s.date)}</div>
+              <div className="rs">{s.count} check-in{s.count !== 1 ? "s" : ""} · tap to view / edit</div>
+            </button>
+            <button className="btn danger" style={{ flex: "none", padding: "8px 14px" }} disabled={deleting} onClick={() => setPendingDelete(s)}>
+              Delete
+            </button>
+          </div>
+        ))}
+        {sessions.length === 0 && <div className="empty-state">No sessions recorded yet.</div>}
+      </div>
+
+      <div className="section-title" style={{ color: "var(--accent-coral)", marginTop: 32 }}>Danger Zone</div>
+      <div className="sub" style={{ marginBottom: 16 }}>
+        For testing before launch — these only touch attendance history (sessions, trends, percentages). Your student and leader roster is never affected.
+      </div>
+      <div className="btn-row" style={{ maxWidth: 520 }}>
+        <button className="btn danger" disabled={wiping || todayIds.length === 0} onClick={() => setPendingResetToday(true)}>
+          Reset Today's Data ({todayIds.length})
+        </button>
+        <button className="btn danger" disabled={wiping || allIds.length === 0} onClick={() => setPendingWipeAll(true)}>
+          Wipe All Attendance Data ({allIds.length})
+        </button>
+      </div>
+
+      {openSession && (
+        <SessionDetailModal
+          session={openSession}
+          students={students}
+          attendance={attendance}
+          onClose={() => setOpenSession(null)}
+          flashToast={flashToast}
+        />
+      )}
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Delete this session?"
+          message={`${sessionLabel(pendingDelete)} — ${fmtDate(pendingDelete.date)} (${pendingDelete.count} check-in${pendingDelete.count !== 1 ? "s" : ""}). This can't be undone.`}
+          confirmLabel="Delete Session"
+          cancelLabel="Cancel"
+          danger
+          onConfirm={confirmDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
+      {pendingResetToday && (
+        <ConfirmDialog
+          title="Reset today's data?"
+          message={`This deletes all ${todayIds.length} check-in${todayIds.length !== 1 ? "s" : ""} recorded today (${fmtDate(todayStr())}), across every room and event. Nothing from any other day is touched. This can't be undone.`}
+          confirmLabel="Reset Today"
+          cancelLabel="Cancel"
+          danger
+          onConfirm={confirmResetToday}
+          onCancel={() => setPendingResetToday(false)}
+        />
+      )}
+      {pendingWipeAll && (
+        <ConfirmDialog
+          title="Wipe ALL attendance data?"
+          message={`This permanently deletes all ${allIds.length} attendance records ever recorded — every session, every check-in, all trend and attendance-percentage history. Your student and leader roster will NOT be touched. This can't be undone.`}
+          confirmLabel="Yes, Wipe Everything"
+          cancelLabel="Cancel"
+          danger
+          onConfirm={confirmWipeAll}
+          onCancel={() => setPendingWipeAll(false)}
+        />
+      )}
+    </>
+  );
+}
+
+// Full detail view for one session: see everyone who attended, add someone
+// who forgot to check in (writes a real attendance record for that date),
+// or remove someone added by mistake.
+function SessionDetailModal({ session, students, attendance, onClose, flashToast }) {
+  const [addQuery, setAddQuery] = useState("");
+  const [pendingRemove, setPendingRemove] = useState(null); // { studentId, studentName, recordIds }
+  const isRoomScoped = session.room !== null;
+
+  const attendeeRows = useMemo(() => {
+    const records = attendance.filter(a => a.date === session.date && a.event === session.event && (!isRoomScoped || a.room === session.room));
+    const byStudent = {};
+    records.forEach(r => {
+      if (!byStudent[r.studentId]) byStudent[r.studentId] = { studentId: r.studentId, studentName: r.studentName, recordIds: [], rooms: [] };
+      byStudent[r.studentId].recordIds.push(r.id);
+      byStudent[r.studentId].rooms.push(r.room);
+    });
+    return Object.values(byStudent).sort((a, b) => lastNameOf(a.studentName).localeCompare(lastNameOf(b.studentName)));
+  }, [attendance, session]);
+
+  const attendeeIds = new Set(attendeeRows.map(a => a.studentId));
+
+  const addCandidates = addQuery.trim()
+    ? students.filter(s => !attendeeIds.has(s.id) && s.active !== false && s.name.toLowerCase().includes(addQuery.toLowerCase()))
+        .sort(byLastName).slice(0, 8)
+    : [];
+
+  // Wednesday sessions are room-scoped, so a backfilled check-in only ever
+  // logs that one room. Sunday/Event sessions are combined — log under the
+  // student's own room(s), same as the live combined kiosk does.
+  async function addStudent(student) {
+    const rooms = isRoomScoped ? [session.room] : (rosterArray(student).length ? rosterArray(student) : ["MS"]);
+    await Promise.all(rooms.map(r =>
+      db.collection("attendance").add({
+        studentId: student.id, studentName: student.name, room: r,
+        event: session.event, date: session.date, combined: !isRoomScoped,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      })
+    ));
+    setAddQuery("");
+    flashToast(`Added ${student.name} to this session.`);
+  }
+
+  async function confirmRemove() {
+    const { studentName, recordIds } = pendingRemove;
+    setPendingRemove(null);
+    await Promise.all(recordIds.map(id => db.collection("attendance").doc(id).delete()));
+    flashToast(`Removed ${studentName} from this session.`);
+  }
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="sheet wide" onClick={e => e.stopPropagation()}>
+        <h2>{sessionLabel(session)}</h2>
+        <div className="sub">{fmtDate(session.date)} · {attendeeRows.length} checked in</div>
+
+        <div className="section-title">Add someone who forgot to check in</div>
+        <div className="field">
+          <input placeholder="Search by name…" value={addQuery} onChange={e => setAddQuery(e.target.value)} />
+        </div>
+        {addCandidates.length > 0 && (
+          <div className="row-list" style={{ marginBottom: 20 }}>
+            {addCandidates.map(s => (
+              <button key={s.id} className="row-item" style={{ width: "100%", border: "1px solid var(--border-soft)", textAlign: "left" }} onClick={() => addStudent(s)}>
+                <div className="rn">{s.name}</div>
+                <span className="btn primary" style={{ flex: "none", padding: "6px 14px", fontSize: 13 }}>+ Add</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {addQuery.trim() && addCandidates.length === 0 && (
+          <div className="sub" style={{ marginBottom: 20 }}>No match, or they're already in this session.</div>
+        )}
+
+        <div className="section-title">Who was there ({attendeeRows.length})</div>
+        <div className="row-list" style={{ maxHeight: 320, overflowY: "auto" }}>
+          {attendeeRows.map(a => (
+            <div key={a.studentId} className="row-item">
+              <div className="rn">{a.studentName}</div>
+              <button className="btn secondary" style={{ flex: "none", padding: "6px 14px", fontSize: 13 }} onClick={() => setPendingRemove(a)}>Remove</button>
+            </div>
+          ))}
+          {attendeeRows.length === 0 && <div className="empty-state">Nobody checked in for this session.</div>}
+        </div>
+
+        <div className="btn-row" style={{ marginTop: 20 }}>
+          <button className="btn secondary" onClick={onClose}>Close</button>
+        </div>
+      </div>
+
+      {pendingRemove && (
+        <ConfirmDialog
+          title="Remove from this session?"
+          message={pendingRemove.studentName}
+          confirmLabel="Remove"
+          cancelLabel="Cancel"
+          danger
+          onConfirm={confirmRemove}
+          onCancel={() => setPendingRemove(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// The "provisional holding area" for one-time Special Event visitors —
+// completely separate from the real roster. An admin can promote a guest
+// into a full student record (if they turn out to be a regular) or just
+// delete the guest record once it's no longer needed.
+function GuestsTab({ guests, flashToast }) {
+  const [openGuest, setOpenGuest] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [promoting, setPromoting] = useState(null);
+
+  const sorted = [...guests].sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+
+  async function confirmDelete() {
+    const guest = pendingDelete;
+    setPendingDelete(null);
+    await db.collection("eventGuests").doc(guest.id).delete();
+    flashToast(`Removed ${guest.name} from guests.`);
+  }
+
+  return (
+    <>
+      <div className="sub" style={{ marginBottom: 16 }}>
+        One-time Special Event visitors — kept separate from your real roster. Promote someone here if they turn out to be a regular, or delete them once you're done with the info.
+      </div>
+      <div className="row-list">
+        {sorted.map(g => (
+          <div key={g.id} className="row-item">
+            <button onClick={() => setOpenGuest(g)} style={{ background: "none", border: "none", textAlign: "left", cursor: "pointer", flex: 1, padding: 0, color: "var(--text-light)" }}>
+              <div className="rn">{g.name}</div>
+              <div className="rs">{g.eventTitle} · {fmtDate(g.date)}</div>
+            </button>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button className="btn secondary" style={{ flex: "none", padding: "8px 14px", fontSize: 13 }} onClick={() => setPromoting(g)}>Promote</button>
+              <button className="btn danger" style={{ flex: "none", padding: "8px 14px", fontSize: 13 }} onClick={() => setPendingDelete(g)}>Delete</button>
+            </div>
+          </div>
+        ))}
+        {sorted.length === 0 && <div className="empty-state">No event guests on file.</div>}
+      </div>
+
+      {openGuest && (
+        <div className="overlay" onClick={() => setOpenGuest(null)}>
+          <div className="sheet" onClick={e => e.stopPropagation()}>
+            <h2>{openGuest.name}</h2>
+            <div className="sub">{openGuest.eventTitle} · {fmtDate(openGuest.date)}</div>
+            <div className="section-title">Emergency contact</div>
+            <div className="sub">
+              {openGuest.emergency?.name} ({openGuest.emergency?.relationship}) · {openGuest.emergency?.phone}
+            </div>
+            <div className="btn-row" style={{ marginTop: 20 }}>
+              <button className="btn secondary" onClick={() => setOpenGuest(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {promoting && <PromoteGuestForm guest={promoting} onClose={() => setPromoting(null)} flashToast={flashToast} />}
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Remove this guest?"
+          message={pendingDelete.name}
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          danger
+          onConfirm={confirmDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
+    </>
+  );
+}
+
+// Turns a guest record into a full roster entry — pre-fills the name and
+// emergency contact they already gave, only asks for the remaining fields
+// a real student profile needs. Deletes the guest record once promoted so
+// they don't exist in both places at once.
+function PromoteGuestForm({ guest, onClose, flashToast }) {
+  const [form, setForm] = useState({
+    birthday: "", grade: "",
+    phone: "", email: ""
+  });
+  const [error, setError] = useState("");
+  const gradeOptions = ["5", "6", "7", "8", "9", "10", "11", "12"];
+
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
+
+  async function submit() {
+    if (!form.birthday || !form.grade) return setError("Birthday and grade are required.");
+    const grade = parseInt(form.grade, 10);
+    const roster = [grade <= 8 ? "MS" : "HS"];
+    try {
+      await db.collection("students").add({
+        name: guest.name, birthday: form.birthday, grade, roster, role: "student",
+        phone: form.phone.trim(), email: form.email.trim(), active: true,
+        // Guests no longer collect an email, but the students schema still
+        // requires the key to exist (even empty) — build a complete object
+        // rather than passing guest.emergency through as-is.
+        emergency: {
+          relationship: guest.emergency?.relationship || "",
+          name: guest.emergency?.name || "",
+          phone: guest.emergency?.phone || "",
+          email: guest.emergency?.email || ""
+        },
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      await db.collection("eventGuests").doc(guest.id).delete();
+      flashToast(`${guest.name} added to the roster.`);
+      onClose();
+    } catch (e) {
+      setError("Couldn't save: " + (e.message || e));
+    }
+  }
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="sheet" onClick={e => e.stopPropagation()}>
+        <h2>Promote {guest.name}</h2>
+        <div className="sub">Their name and emergency contact carry over — just fill in the rest.</div>
+        <div className="field"><label>Birthday *</label><input type="date" value={form.birthday} onChange={e => set("birthday", e.target.value)} /></div>
+        <div className="field"><label>Grade *</label>
+          <select value={form.grade} onChange={e => set("grade", e.target.value)}>
+            <option value="">Select grade…</option>
+            {gradeOptions.map(g => <option key={g} value={g}>{g}th grade</option>)}
+          </select>
+        </div>
+        <div className="field-row">
+          <div className="field"><label>Phone (optional)</label><input type="tel" value={form.phone} onChange={e => set("phone", e.target.value)} /></div>
+          <div className="field"><label>Email (optional)</label><input type="email" value={form.email} onChange={e => set("email", e.target.value)} /></div>
+        </div>
+        {error && <div className="error-text">{error}</div>}
+        <div className="btn-row">
+          <button className="btn secondary" onClick={onClose}>Cancel</button>
+          <button className="btn primary" onClick={submit}>Add to Roster</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PromoteTab({ students, flashToast }) {
+  const [confirming, setConfirming] = useState(false);
+  const active = students.filter(s => s.active !== false && typeof s.grade === "number");
+  const seniors = active.filter(s => s.grade === 12);
+  const eighth = active.filter(s => s.grade === 8);
+
+  async function promote() {
+    const batch = db.batch();
+    active.forEach(s => {
+      const ref = db.collection("students").doc(s.id);
+      if (s.grade === 12) {
+        batch.update(ref, { active: false });
+      } else {
+        const newGrade = s.grade + 1;
+        const newRoster = [newGrade <= 8 ? "MS" : "HS"];
+        batch.update(ref, { grade: newGrade, roster: newRoster });
+      }
+    });
+    await batch.commit();
+    setConfirming(false);
+    flashToast("Everyone's been promoted a grade.");
+  }
+
+  return (
+    <div style={{ maxWidth: 480 }}>
+      <div className="stat-grid">
+        <div className="stat-card"><div className="num">{active.length}</div><div className="lbl">Active students</div></div>
+        <div className="stat-card"><div className="num">{eighth.length}</div><div className="lbl">8th → moving to HS</div></div>
+        <div className="stat-card"><div className="num">{seniors.length}</div><div className="lbl">Seniors → going inactive</div></div>
+      </div>
+      <p className="sub">
+        Run this once a year (start of the school year). Every active student with a grade moves up one grade;
+        8th graders switch to the HS roster; current 12th graders are marked inactive (not deleted).
+        Leaders (no grade on file) are skipped automatically. Add incoming 5th graders manually beforehand
+        from the Roster tab — they'll count as Middle School even though they're not offered as a grade
+        option on the self-serve form.
+      </p>
+      {!confirming
+        ? <button className="btn primary" style={{ width: "100%" }} onClick={() => setConfirming(true)}>Promote Everyone</button>
+        : (
+          <>
+            <div className="error-text" style={{ marginBottom: 12 }}>This can't be undone automatically. Are you sure?</div>
+            <div className="btn-row">
+              <button className="btn secondary" onClick={() => setConfirming(false)}>Cancel</button>
+              <button className="btn danger" onClick={promote}>Yes, promote everyone</button>
+            </div>
+          </>
+        )}
+    </div>
+  );
+}
+
+function TrendsTab({ attendance, students }) {
+  const msRef = useRef(null), hsRef = useRef(null), combinedRef = useRef(null), sundayRef = useRef(null);
+  const chartsRef = useRef({});
+
+  // Wednesday is genuinely two separate concurrent meetings, so these three
+  // charts are scoped to Wednesday attendance only (categorizeEvent keys
+  // off the "(Wed)" event names). Sunday/Events are one combined gathering
+  // and get their own separate chart below, counting everyone together.
+  const weeklyData = useMemo(() => {
+    const byDate = {};
+    attendance.filter(a => categorizeEvent(a.event) === "wednesday").forEach(a => {
+      byDate[a.date] = byDate[a.date] || { MS: 0, HS: 0 };
+      byDate[a.date][a.room] = (byDate[a.date][a.room] || 0) + 1;
+    });
+    const dates = Object.keys(byDate).sort().slice(-16);
+    return {
+      labels: dates.map(fmtDate),
+      ms: dates.map(d => byDate[d].MS || 0),
+      hs: dates.map(d => byDate[d].HS || 0),
+      combined: dates.map(d => (byDate[d].MS || 0) + (byDate[d].HS || 0))
+    };
+  }, [attendance]);
+
+  const sundayWeeklyData = useMemo(() => {
+    const byDate = {};
+    attendance.filter(a => categorizeEvent(a.event) === "sunday").forEach(a => {
+      byDate[a.date] = byDate[a.date] || new Set();
+      byDate[a.date].add(a.studentId);
+    });
+    const dates = Object.keys(byDate).sort().slice(-16);
+    return {
+      labels: dates.map(fmtDate),
+      combined: dates.map(d => byDate[d].size)
+    };
+  }, [attendance]);
+
+  useEffect(() => {
+    Object.values(chartsRef.current).forEach(c => c && c.destroy());
+    const mk = (ref, label, labels, data, color) => {
+      if (!ref.current) return null;
+      return new Chart(ref.current, {
+        type: "line",
+        data: { labels, datasets: [{ label, data, borderColor: color, backgroundColor: color + "33", fill: true, tension: 0.3 }] },
+        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { color: "#B0B0B0" } }, x: { ticks: { color: "#B0B0B0" } } } }
+      });
+    };
+    chartsRef.current.ms = mk(msRef, "MS Attendance (Wed)", weeklyData.labels, weeklyData.ms, "#FFD400");
+    chartsRef.current.hs = mk(hsRef, "HS Attendance (Wed)", weeklyData.labels, weeklyData.hs, "#7A3327");
+    chartsRef.current.combined = mk(combinedRef, "Combined (Wed)", weeklyData.labels, weeklyData.combined, "#FFFFFF");
+    chartsRef.current.sunday = mk(sundayRef, "Sunday (Everyone)", sundayWeeklyData.labels, sundayWeeklyData.combined, "#FFFFFF");
+  }, [weeklyData, sundayWeeklyData]);
+
+  const wholeRosterSize = students.filter(s => s.role !== "leader" && s.active !== false).length;
+  const msRosterSize = students.filter(s => s.role !== "leader" && s.active !== false && rosterArray(s).includes("MS")).length;
+  const hsRosterSize = students.filter(s => s.role !== "leader" && s.active !== false && rosterArray(s).includes("HS")).length;
+
+  // Sunday/Events are one combined gathering — count distinct people
+  // regardless of which room their attendance record landed in. Wednesday
+  // is genuinely two separate concurrent meetings, so it stays split.
+  function buildCombinedTable(category, n) {
+    const filtered = attendance.filter(a => categorizeEvent(a.event) === category);
+    const dates = [...new Set(filtered.map(a => a.date))].sort().reverse().slice(0, n);
+    return dates.map(date => {
+      const attendees = new Set(filtered.filter(a => a.date === date).map(a => a.studentId));
+      return { date, count: attendees.size, pct: wholeRosterSize > 0 ? Math.round((attendees.size / wholeRosterSize) * 100) : 0 };
+    });
+  }
+  function buildRoomTable(category, room, n) {
+    const filtered = attendance.filter(a => categorizeEvent(a.event) === category && a.room === room);
+    const dates = [...new Set(filtered.map(a => a.date))].sort().reverse().slice(0, n);
+    const rosterSize = room === "MS" ? msRosterSize : hsRosterSize;
+    return dates.map(date => {
+      const attendees = new Set(filtered.filter(a => a.date === date).map(a => a.studentId));
+      return { date, count: attendees.size, pct: rosterSize > 0 ? Math.round((attendees.size / rosterSize) * 100) : 0 };
+    });
+  }
+  const sundayRows = buildCombinedTable("sunday", 8);
+  const wednesdayMsRows = buildRoomTable("wednesday", "MS", 8);
+  const wednesdayHsRows = buildRoomTable("wednesday", "HS", 8);
+
+  // Special Events are irregular and often pull in one-time guests, so they
+  // don't fit a weekly line chart or a "% of roster" comparison the way
+  // Sunday/Wednesday do — a plain chronological list of what happened is
+  // more useful than trying to force them into the same shape.
+  const specialEvents = useMemo(() => {
+    const filtered = attendance.filter(a => isRecordCombined(a) && a.event !== "Sunday Morning");
+    const byKey = {};
+    filtered.forEach(a => {
+      const key = a.date + "|" + a.event;
+      if (!byKey[key]) byKey[key] = { key, date: a.date, event: a.event, studentIds: new Set(), guestIds: new Set() };
+      byKey[key].studentIds.add(a.studentId);
+      if (a.isGuest) byKey[key].guestIds.add(a.studentId);
+    });
+    return Object.values(byKey)
+      .map(e => ({ key: e.key, date: e.date, event: e.event, total: e.studentIds.size, guests: e.guestIds.size }))
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 12);
+  }, [attendance]);
+  const totalEventAttendance = specialEvents.reduce((sum, e) => sum + e.total, 0);
+
+  function SessionTable({ title, rows, rosterSize }) {
+    return (
+      <div className="chart-card">
+        <h3>{title}</h3>
+        <div className="sub" style={{ marginBottom: 12 }}>Out of {rosterSize} active student{rosterSize !== 1 ? "s" : ""} on this roster.</div>
+        {rows.length === 0
+          ? <div className="empty-state">No sessions recorded yet.</div>
+          : (
+            <div className="row-list">
+              {rows.map(r => (
+                <div key={r.date} className="row-item">
+                  <div className="rn">{fmtDate(r.date)}</div>
+                  <div style={{ textAlign: "right" }}>
+                    <div className="rn">{r.count} attended</div>
+                    <div className="rs">{r.pct}% of roster</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="chart-card"><h3>Wednesday — Combined (MS + HS)</h3><canvas ref={combinedRef}></canvas></div>
+      <div className="chart-card"><h3>Wednesday — Middle School (Torrid)</h3><canvas ref={msRef}></canvas></div>
+      <div className="chart-card"><h3>Wednesday — High School (The Barn)</h3><canvas ref={hsRef}></canvas></div>
+      <div className="chart-card"><h3>Sunday — Everyone</h3><canvas ref={sundayRef}></canvas></div>
+      <SessionTable title="Last 8 Sundays" rows={sundayRows} rosterSize={wholeRosterSize} />
+      <SessionTable title="Last 8 Wednesdays — Torrid (MS)" rows={wednesdayMsRows} rosterSize={msRosterSize} />
+      <SessionTable title="Last 8 Wednesdays — The Barn (HS)" rows={wednesdayHsRows} rosterSize={hsRosterSize} />
+
+      <div className="chart-card">
+        <h3>Special Events</h3>
+        <div className="sub" style={{ marginBottom: 12 }}>
+          These are one-off and often bring in guests who aren't part of your regular roster, so there's no weekly chart or roster percentage here — just what actually happened at each one.
+        </div>
+        {specialEvents.length > 0 && (
+          <div className="stat-grid" style={{ marginBottom: 16 }}>
+            <div className="stat-card"><div className="num">{specialEvents.length}</div><div className="lbl">Events tracked</div></div>
+            <div className="stat-card"><div className="num">{totalEventAttendance}</div><div className="lbl">Total attendance</div></div>
+            <div className="stat-card"><div className="num">{Math.round(totalEventAttendance / specialEvents.length)}</div><div className="lbl">Avg. per event</div></div>
+          </div>
+        )}
+        {specialEvents.length === 0
+          ? <div className="empty-state">No special events recorded yet.</div>
+          : (
+            <div className="row-list">
+              {specialEvents.map(e => (
+                <div key={e.key} className="row-item">
+                  <div>
+                    <div className="rn">{e.event}</div>
+                    <div className="rs">{fmtDate(e.date)}</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div className="rn">{e.total} attended</div>
+                    {e.guests > 0 && <div className="rs">{e.guests} guest{e.guests !== 1 ? "s" : ""}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+      </div>
+    </>
+  );
+}
+
+function ProfileModal({ student, attendance, onClose, flashToast }) {
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({ ...student });
+  const [pendingDelete, setPendingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const history = attendance.filter(a => a.studentId === student.id).sort((a, b) => b.date.localeCompare(a.date));
+  const yearStats = attendanceStatsForStudent(student.id, attendance);
+
+  async function save() {
+    const parsedGrade = parseInt(form.grade, 10);
+    await db.collection("students").doc(student.id).update({
+      name: form.name, grade: Number.isFinite(parsedGrade) ? parsedGrade : null, birthday: form.birthday,
+      phone: form.phone || "", email: form.email || "",
+      emergency: form.emergency || {}
+    });
+    flashToast("Profile updated.");
+    setEditing(false);
+  }
+  async function toggleActive() {
+    await db.collection("students").doc(student.id).update({ active: !(student.active !== false) });
+    flashToast(student.active === false ? "Marked active." : "Marked inactive.");
+  }
+  async function confirmPermanentDelete() {
+    setPendingDelete(false);
+    setDeleting(true);
+    try {
+      const batch = db.batch();
+      history.forEach(h => batch.delete(db.collection("attendance").doc(h.id)));
+      batch.delete(db.collection("students").doc(student.id));
+      await batch.commit();
+      flashToast(`Permanently deleted ${student.name}.`);
+      onClose();
+    } catch (e) {
+      window.alert("Delete failed: " + e.message);
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="sheet wide" onClick={e => e.stopPropagation()}>
+        {!editing ? (
+          <>
+            <h2>{student.name}</h2>
+            <div className="sub">{student.role === "leader" ? "Leader" : `Grade ${student.grade}`} · {rosterArray(student).join(" + ")} {student.active === false ? "· Inactive" : ""}</div>
+            <div className="stat-grid">
+              <div className="stat-card"><div className="num">{history.length}</div><div className="lbl">Total check-ins</div></div>
+              <div className="stat-card"><div className="num">{history[0] ? fmtDate(history[0].date) : "—"}</div><div className="lbl">Last seen</div></div>
+              <div className="stat-card"><div className="num">{student.role === "leader" ? "—" : student.grade}</div><div className="lbl">Grade</div></div>
+            </div>
+            <div className="section-title">This Ministry Year (since Labor Day)</div>
+            <div className="stat-grid">
+              <div className="stat-card"><div className="num">{yearStats.sunday.pct === null ? "—" : yearStats.sunday.pct + "%"}</div><div className="lbl">Sundays ({yearStats.sunday.attended}/{yearStats.sunday.total})</div></div>
+              <div className="stat-card"><div className="num">{yearStats.wednesday.pct === null ? "—" : yearStats.wednesday.pct + "%"}</div><div className="lbl">Wednesdays ({yearStats.wednesday.attended}/{yearStats.wednesday.total})</div></div>
+              <div className="stat-card"><div className="num">{yearStats.events.pct === null ? "—" : yearStats.events.pct + "%"}</div><div className="lbl">Events ({yearStats.events.attended}/{yearStats.events.total})</div></div>
+            </div>
+            <div className="section-title">Contact</div>
+            <div className="sub">Birthday: {student.birthday || "—"} · Phone: {student.phone || "—"} · Email: {student.email || "—"}</div>
+            <div className="section-title">Emergency contact</div>
+            <div className="sub">
+              {student.emergency?.name} ({student.emergency?.relationship}) · {student.emergency?.phone} · {student.emergency?.email}
+            </div>
+            <div className="section-title">Attendance history</div>
+            <div className="row-list" style={{ maxHeight: 220, overflowY: "auto" }}>
+              {history.map(h => (
+                <div key={h.id} className="row-item"><div className="rn">{fmtDate(h.date)}</div><div className="rs mono">{h.event}</div></div>
+              ))}
+              {history.length === 0 && <div className="empty-state">No attendance recorded yet.</div>}
+            </div>
+            <div className="btn-row">
+              <button className="btn secondary" onClick={onClose}>Close</button>
+              <button className="btn secondary" onClick={() => setEditing(true)}>Edit</button>
+              <button className="btn danger" onClick={toggleActive}>{student.active === false ? "Mark Active" : "Mark Inactive"}</button>
+            </div>
+            {student.active === false && (
+              <div className="btn-row" style={{ marginTop: 10 }}>
+                <button className="btn danger" disabled={deleting} onClick={() => setPendingDelete(true)}>
+                  Delete Permanently
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <h2>Edit {student.name}</h2>
+            <div className="field"><label>Name</label><input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+            <div className="field"><label>Grade</label><input type="number" min="5" max="12" placeholder="Leave blank for leaders" value={form.grade ?? ""} onChange={e => setForm(f => ({ ...f, grade: e.target.value }))} /></div>
+            <div className="field"><label>Birthday</label><input type="date" value={form.birthday || ""} onChange={e => setForm(f => ({ ...f, birthday: e.target.value }))} /></div>
+            <div className="field-row">
+              <div className="field"><label>Phone</label><input value={form.phone || ""} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
+              <div className="field"><label>Email</label><input value={form.email || ""} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
+            </div>
+            <div className="section-title">Emergency contact</div>
+            <div className="field-row">
+              <div className="field"><label>Relationship</label><input value={form.emergency?.relationship || ""} onChange={e => setForm(f => ({ ...f, emergency: { ...f.emergency, relationship: e.target.value } }))} /></div>
+              <div className="field"><label>Name</label><input value={form.emergency?.name || ""} onChange={e => setForm(f => ({ ...f, emergency: { ...f.emergency, name: e.target.value } }))} /></div>
+            </div>
+            <div className="field-row">
+              <div className="field"><label>Phone</label><input value={form.emergency?.phone || ""} onChange={e => setForm(f => ({ ...f, emergency: { ...f.emergency, phone: e.target.value } }))} /></div>
+              <div className="field"><label>Email</label><input value={form.emergency?.email || ""} onChange={e => setForm(f => ({ ...f, emergency: { ...f.emergency, email: e.target.value } }))} /></div>
+            </div>
+            <div className="btn-row">
+              <button className="btn secondary" onClick={() => setEditing(false)}>Cancel</button>
+              <button className="btn primary" onClick={save}>Save</button>
+            </div>
+          </>
+        )}
+      </div>
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Delete permanently?"
+          message={`${student.name} — this removes their profile AND all ${history.length} attendance record${history.length !== 1 ? "s" : ""} for good. This can't be undone.`}
+          confirmLabel="Delete Permanently"
+          cancelLabel="Cancel"
+          danger
+          onConfirm={confirmPermanentDelete}
+          onCancel={() => setPendingDelete(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Catches errors thrown DURING React's render (the most common crash source).
+// This works even when window.onerror can't see through Babel's in-browser
+// transform — React's own error handling never touches the browser's
+// generic (and CORS-sanitizing) error reporting path at all.
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  componentDidMount() {
+    // Route ALL fatal errors (window-level, Firestore listeners) through
+    // this component's own setState from now on, instead of raw DOM writes —
+    // so React manages the DOM change itself and nothing fights over it.
+    reportFatalError = (details) => this.setState({ error: String(details) });
+  }
+  componentDidCatch(error, info) {
+    const details =
+      (error && (error.stack || error.message)) + "\n\nComponent stack:" +
+      (info && info.componentStack ? info.componentStack : " (unavailable)");
+    this.setState({ error: details });
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 24, color: "#fff", background: "#0A0A0A", fontFamily: "monospace", whiteSpace: "pre-wrap", minHeight: "100vh", boxSizing: "border-box" }}>
+          <h2 style={{ color: "#E10600", marginTop: 0 }}>Something went wrong</h2>
+          <p style={{ fontFamily: "sans-serif" }}>Please screenshot this whole screen and send it over.</p>
+          <pre style={{ background: "#1A1A1A", padding: 16, borderRadius: 8, overflow: "auto", border: "1px solid #3D3D3D" }}>
+            {this.state.error}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<ErrorBoundary><App /></ErrorBoundary>);
+</script>
+</body>
+</html>
