@@ -22,11 +22,19 @@ export async function onRequest(context) {
 
   if (request.method === "POST") {
     const body = await request.text();
-    let incoming;
+    let incoming, force;
     try {
-      incoming = JSON.parse(body);
+      const parsed = JSON.parse(body);
+      // Support both plain array and {data, force} envelope
+      if (Array.isArray(parsed)) {
+        incoming = parsed;
+        force = false;
+      } else {
+        incoming = parsed.data;
+        force = parsed.force === true;
+      }
       if (!Array.isArray(incoming)) throw new Error("not array");
-    } catch {
+    } catch (_e) {
       return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400, headers });
     }
 
@@ -35,43 +43,35 @@ export async function onRequest(context) {
       return new Response(JSON.stringify({ error: "Refusing to store empty data" }), { status: 400, headers });
     }
 
-    // Read current KV and merge person-by-person using updatedAt
+    // Force mode: skip merge, write directly (used for deletes)
+    if (force) {
+      await env.INTERCEDE_KV.put("people", JSON.stringify(incoming));
+      return new Response(JSON.stringify({ ok: true, count: incoming.length, forced: true }), { headers });
+    }
+
+    // Normal mode: merge person-by-person using updatedAt
     let stored = [];
     try {
       const raw = await env.INTERCEDE_KV.get("people");
       if (raw) stored = JSON.parse(raw);
       if (!Array.isArray(stored)) stored = [];
-    } catch { stored = []; }
+    } catch (_e) { stored = []; }
 
-    // Build lookup maps
     const storedMap = Object.fromEntries(stored.map(p => [p.id, p]));
     const incomingMap = Object.fromEntries(incoming.map(p => [p.id, p]));
 
-    // Merge: for each unique ID, keep whichever version has a newer updatedAt
-    const allIds = new Set([...Object.keys(storedMap), ...Object.keys(incomingMap)]);
-    const merged = [];
-    for (const id of allIds) {
-      const s = storedMap[id];
-      const i = incomingMap[id];
-      if (s && i) {
-        // Both have this person — keep the newer one
-        merged.push((i.updatedAt || 0) >= (s.updatedAt || 0) ? i : s);
-      } else {
-        // Only one side has this person — keep it
-        merged.push(s || i);
-      }
-    }
-
-    // Sort by original incoming order where possible, new entries at end
-    const incomingOrder = incoming.map(p => p.id);
-    merged.sort((a, b) => {
-      const ai = incomingOrder.indexOf(a.id);
-      const bi = incomingOrder.indexOf(b.id);
-      if (ai >= 0 && bi >= 0) return ai - bi;
-      if (ai >= 0) return -1;
-      if (bi >= 0) return 1;
-      return 0;
+    // Only merge IDs present in incoming — deleted IDs are intentionally absent
+    const merged = incoming.map(p => {
+      const s = storedMap[p.id];
+      if (!s) return p; // new person
+      return (p.updatedAt || 0) >= (s.updatedAt || 0) ? p : s;
     });
+
+    // Also add any IDs from stored that aren't in incoming (added by another device)
+    const incomingIds = new Set(incoming.map(p => p.id));
+    for (const s of stored) {
+      if (!incomingIds.has(s.id)) merged.push(s);
+    }
 
     await env.INTERCEDE_KV.put("people", JSON.stringify(merged));
     return new Response(JSON.stringify({ ok: true, count: merged.length }), { headers });
