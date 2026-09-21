@@ -948,7 +948,7 @@ export default function App() {
 
   function addPerson() {
     if (!addName.trim()) return;
-    setPeople(prev => [...prev, { id: genId(), name: addName.trim(), type: addType, group: addType === "student" ? addGroup : null, grade: addType === "student" && addGrade ? Number(addGrade) : null, active: true, prayedAt: null, prayerRequests: [], birthday: addBday.trim() ? formatBirthday(addBday.trim()) : "", updatedAt: Date.now() }]); setAddBday("");
+    setPeople(prev => [...prev, { id: genId(), name: addName.trim(), type: addType, group: addType === "student" ? addGroup : null, grade: addType === "student" && addGrade ? Number(addGrade) : null, active: true, prayedAt: null, prayerRequests: [], birthday: addBday.trim() || "", updatedAt: Date.now() }]); setAddBday("");
     setAddName("");
     setAddGrade("");
   }
@@ -1231,7 +1231,7 @@ export default function App() {
         {[["pray","Pray"],["week","Week"],["roster","Roster"]].map(([v, label]) => (
           <button key={v} onClick={() => setView(v)} style={{ ...S.tab, ...(view === v ? S.tabActive : {}) }}>{label}</button>
         ))}
-        {adminAuthed && [["people","People"],["import","Import"]].map(([v, label]) => (
+        {adminAuthed && [["people","People"],["report","Report"],["import","Import"]].map(([v, label]) => (
           <button key={v} onClick={() => setView(v)} style={{ ...S.tab, ...(view === v ? S.tabActive : {}) }}>{label}</button>
         ))}
       </nav>
@@ -1613,28 +1613,30 @@ export default function App() {
       {/* ─── PEOPLE ─── */}
       {view === "people" && (
         <div style={S.peopleWrap}>
-          <div style={S.addRow}>
-            <input value={addName} onChange={e => setAddName(e.target.value)} onKeyDown={e => e.key === "Enter" && addPerson()} placeholder="Full name" style={S.addInput} />
-            <select value={addType} onChange={e => setAddType(e.target.value)} style={S.addTypeSelect}>
-              <option value="student">Student</option>
-              <option value="leader">Leader</option>
-            </select>
-          </div>
-          <div style={S.addRow}>
-            <select value={addGroup} onChange={e => setAddGroup(e.target.value)} style={{ ...S.addTypeSelect, flex: 1 }}>
-              <option value="hs">HS</option>
-              <option value="ms">MS</option>
-            </select>
-            {addType === "student" && (
-              <select value={addGrade} onChange={e => { const g = e.target.value; setAddGrade(g); if (g && addType === 'student') setAddGroup(Number(g) >= 9 ? 'hs' : 'ms'); }} style={{ ...S.addTypeSelect, flex: 1 }}>
-                <option value="">Grade</option>
-                {[5,6,7,8,9,10,11,12].map(g => <option key={g} value={g}>{`Grade ${g}`}</option>)}
+          {/* ── Add person form ── */}
+          <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px", display:"flex", flexDirection:"column", gap:8, marginBottom:4 }}>
+            <p style={{ margin:0, fontSize:11, color:C.muted, textTransform:"uppercase", letterSpacing:"0.06em", fontWeight:600 }}>Add Person</p>
+            <input value={addName} onChange={e => setAddName(e.target.value)} onKeyDown={e => e.key === "Enter" && addPerson()} placeholder="Full name" style={{ ...S.addInput, margin:0 }} />
+            <div style={{ display:"flex", gap:8 }}>
+              <select value={addType} onChange={e => { setAddType(e.target.value); }} style={{ ...S.addTypeSelect, flex:1 }}>
+                <option value="student">Student</option>
+                <option value="leader">Leader</option>
               </select>
-            )}
-          </div>
-          <div style={S.addRow}>
-            <input value={addBday} onChange={e => setAddBday(e.target.value)} placeholder="Birthday MM-DD (optional)" style={{ ...S.addInput, flex: 1, fontSize: 13 }} />
-            <button onClick={addPerson} style={S.addPersonBtn}><Plus size={16} /></button>
+              <select value={addGroup} onChange={e => setAddGroup(e.target.value)} style={{ ...S.addTypeSelect, flex:1 }}>
+                <option value="hs">HS</option>
+                <option value="ms">MS</option>
+              </select>
+              {addType === "student" && (
+                <select value={addGrade} onChange={e => { const g = e.target.value; setAddGrade(g); if (g) setAddGroup(Number(g) >= 9 ? "hs" : "ms"); }} style={{ ...S.addTypeSelect, flex:1 }}>
+                  <option value="">Grade</option>
+                  {[5,6,7,8,9,10,11,12].map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              )}
+            </div>
+            <div style={{ display:"flex", gap:8 }}>
+              <input value={addBday} onChange={e => setAddBday(e.target.value)} placeholder="Birthday MM-DD (optional)" style={{ ...S.addInput, flex:1, margin:0, fontSize:13 }} />
+              <button onClick={addPerson} style={{ ...S.addPersonBtn, width:44, height:44 }}><Plus size={18} /></button>
+            </div>
           </div>
 
           <div style={S.statRow}>
@@ -1643,6 +1645,14 @@ export default function App() {
             ))}
           </div>
 
+          {/* Type filter */}
+          <div style={{ display:"flex", gap:16, justifyContent:"center", marginBottom:6 }}>
+            {[["all","All"],["student","Students"],["leader","Leaders"]].map(([val, label]) => (
+              <button key={val} onClick={() => setPeopleTypeFilter(val)} style={{ background:"none", border:"none", borderBottom: peopleTypeFilter === val ? `2px solid ${C.accent}` : "2px solid transparent", color: peopleTypeFilter === val ? C.cream : C.muted, fontSize:13, fontWeight: peopleTypeFilter === val ? 500 : 400, padding:"2px 0", cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif" }}>
+                {label}
+              </button>
+            ))}
+          </div>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search people…" style={{ ...S.addInput, marginBottom: 4 }} />
           <div style={{ display:"flex", gap:16, marginBottom:10, justifyContent:"center" }}>
             {[["name","A–Z"],["group","MS/HS"],["grade","Grade"],["birthday","Birthday"]].map(([val, label]) => (
@@ -1653,7 +1663,7 @@ export default function App() {
           </div>
 
           <div style={S.personList}>
-            {activePeople.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).slice().sort((a, b) => {
+            {activePeople.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) && (peopleTypeFilter === "all" || p.type === peopleTypeFilter)).slice().sort((a, b) => {
               if (peopleSort === "group") {
                 const ga = a.group === "ms" ? 0 : a.group === "hs" ? 1 : 2;
                 const gb = b.group === "ms" ? 0 : b.group === "hs" ? 1 : 2;
@@ -1881,10 +1891,10 @@ export default function App() {
         </div>
       )}
 
-      {/* ─── IMPORT ─── */}
-      {view === "import" && (
+
+      {/* ─── REPORT ─── */}
+      {view === "report" && (
         <div style={S.importWrap}>
-          {/* Weekly prayer report */}
           <div style={S.reportBox}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}><BarChart2 size={16} color={C.accent} /><p style={{ ...S.reportTitle, margin:0 }}>Weekly Prayer Report</p></div>
@@ -1903,7 +1913,7 @@ export default function App() {
               <p style={S.reportEmpty}>Data will appear here after the first Monday reset.</p>
             ) : weekHistory.map((w, i) => {
               const pct = w.total > 0 ? Math.round((w.count / w.total) * 100) : 0;
-              const weekEndTs = w.weekStart - 1; // Sunday before current week = last day of reported week
+              const weekEndTs = w.weekStart - 1;
               const label = i === 0
                 ? `${getWeekLabel(w.prevWeekStart)} – ${getWeekLabel(weekEndTs)} (last week)`
                 : `${getWeekLabel(w.prevWeekStart)} – ${getWeekLabel(weekEndTs)}`;
@@ -1921,7 +1931,12 @@ export default function App() {
               );
             })}
           </div>
+        </div>
+      )}
 
+      {/* ─── IMPORT ─── */}
+      {view === "import" && (
+        <div style={S.importWrap}>
           {/* Export */}
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 16px", background:C.surface, border:`1px solid ${C.border}`, borderRadius:12 }}>
             <div>
