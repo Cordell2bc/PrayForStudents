@@ -939,6 +939,7 @@ export default function App() {
 
   const [addGrade, setAddGrade] = useState("");
   const [addBday, setAddBday] = useState("");
+  const [justAddedId, setJustAddedId] = useState(null);
   const [uploadingPhotoFor, setUploadingPhotoFor] = useState(null);
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [lightboxName, setLightboxName] = useState(null);
@@ -949,9 +950,13 @@ export default function App() {
 
   function addPerson() {
     if (!addName.trim()) return;
-    setPeople(prev => [...prev, { id: genId(), name: addName.trim(), type: addType, group: addType === "student" ? addGroup : null, grade: addType === "student" && addGrade ? Number(addGrade) : null, active: true, prayedAt: null, prayerRequests: [], birthday: addBday.trim() || "", updatedAt: Date.now() }]); setAddBday("");
+    const newId = genId();
+    setPeople(prev => [...prev, { id: newId, name: addName.trim(), type: addType, group: addType === "student" ? addGroup : null, grade: addType === "student" && addGrade ? Number(addGrade) : null, active: true, prayedAt: null, prayerRequests: [], birthday: addBday.trim() || "", updatedAt: Date.now() }]);
+    setAddBday("");
     setAddName("");
     setAddGrade("");
+    setJustAddedId(newId);
+    setTimeout(() => setJustAddedId(null), 8000);
   }
 
   function cycleGroup(id) {
@@ -1698,16 +1703,19 @@ export default function App() {
                         <button onClick={() => setEditNameFor(null)} style={S.reqCancelBtn}><X size={12} /></button>
                       </div>
                     ) : (
-                      <div style={S.nameRow}>
+                      <div style={{ ...S.nameRow, ...(p.id === justAddedId ? { background: C.accentBg, margin:"-8px -8px 0", padding:"8px 8px 0", borderRadius:"8px 8px 0 0" } : {}) }}>
                         {/* Photo thumbnail / upload */}
-                        <label style={{ cursor:"pointer", display:"flex", alignItems:"center", marginRight:8, flexShrink:0 }} title="Upload photo">
+                        <label style={{ cursor:"pointer", display:"flex", alignItems:"center", marginRight:8, flexShrink:0, position:"relative" }} title="Upload photo">
                           <input type="file" accept="image/*" style={{ display:"none" }} onChange={e => { if (e.target.files[0]) uploadPhoto(p.id, e.target.files[0]); e.target.value=""; }} />
                           {uploadingPhotoFor === p.id
                             ? <span style={{ fontSize:11, color:C.muted }}>…</span>
                             : p.photoUrl
                               ? <img src={p.photoUrl} style={{ width:28, height:28, objectFit:"cover", borderRadius:3, border:`1px solid ${C.border}` }} />
-                              : <span style={{ fontSize:16, opacity:0.4 }}>📷</span>
+                              : <span style={{ fontSize:16, opacity: p.id === justAddedId ? 1 : 0.4 }}>📷</span>
                           }
+                          {p.id === justAddedId && !p.photoUrl && (
+                            <span style={{ position:"absolute", top:-18, left:"50%", transform:"translateX(-50%)", background:C.accent, color:"#fff", fontSize:9, fontWeight:600, borderRadius:4, padding:"2px 5px", whiteSpace:"nowrap", pointerEvents:"none" }}>Add photo</span>
+                          )}
                         </label>
                         <span style={S.personName}>{p.name}</span>
                         <button onClick={() => { setEditNameFor(p.id); setNameInput(p.name); setEditBdayFor(null); }}
