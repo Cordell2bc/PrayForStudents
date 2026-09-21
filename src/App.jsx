@@ -943,6 +943,7 @@ export default function App() {
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [lightboxName, setLightboxName] = useState(null);
   const [peopleSort, setPeopleSort] = useState("name");
+  const [peopleTypeFilter, setPeopleTypeFilter] = useState("all");
   const [rosterGroup, setRosterGroup] = useState("all"); // all | ms | hs | leader
   const [rosterSort, setRosterSort] = useState("name"); // name | grade | birthday
 
