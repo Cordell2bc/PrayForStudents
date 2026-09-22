@@ -2,15 +2,9 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, Heart, Plus, Trash2, Upload, X, RefreshCw, BookOpen, RotateCcw, Cake, BarChart2, Bell, Star, Lightbulb } from "lucide-react";
 
 const STORAGE_KEY = "intercede-people-v2";
-const ADMIN_PASSWORD = "Promo1398!";
-const VAPID_PUBLIC_KEY = "BI4OYduhY_kBu_GJZtEsQAURClmTLOKMFM23GDuZ5EKd6z7dP5NcuCa0bZVv9eShUr9-gCFrhT1WenkRZAa4vJw";
+// Admin password and branding set during first-run setup
+const SETUP_KEY = "letspray-setup";
 
-function urlBase64ToUint8Array(base64String) {
-  const padding = "=".repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = atob(base64);
-  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
-}
 const TAP_KEY = "intercede-tap-ts";
 const TAP_TTL = 24 * 60 * 60 * 1000;
 
@@ -69,21 +63,7 @@ async function apiSave(people, force = false) {
   });
 }
 
-async function apiRegisterPush(subscription, reminderTime) {
-  await fetch("/api/push-register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ subscription, reminderTime }),
-  });
-}
 
-async function apiMarkSeen(endpointHash) {
-  await fetch("/api/push-check", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ endpointHash }),
-  });
-}
 
 async function apiLoadHistory() {
   const res = await fetch("/api/history");
@@ -106,23 +86,6 @@ function getWeekLabel(weekStartTs) {
 }
 
 // Stable per-person rotation so the card looks the same each load but varies per person
-async function resizeImage(file, maxSize) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-      const w = Math.round(img.width * scale);
-      const h = Math.round(img.height * scale);
-      const canvas = document.createElement("canvas");
-      canvas.width = w; canvas.height = h;
-      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-      canvas.toBlob(resolve, "image/jpeg", 0.85);
-    };
-    img.src = url;
-  });
-}
 
 function photoRotation(id) {
   let hash = 0;
@@ -501,7 +464,54 @@ function AllPrayedScreen({ prayedCount, praySessionCount, total, onWeek, onKeepP
   );
 }
 
+
+function getSetup() {
+  try { const r = localStorage.getItem("letspray-setup"); return r ? JSON.parse(r) : null; }
+  catch (_e) { return null; }
+}
+
+function SetupScreen({ onComplete }) {
+  const [name, setName] = React.useState("");
+  const [sub, setSub] = React.useState("");
+  const [pw, setPw] = React.useState("");
+  const [pw2, setPw2] = React.useState("");
+  const [err, setErr] = React.useState("");
+  function submit() {
+    if (!name.trim()) return setErr("Please enter your ministry name.");
+    if (pw.length < 6) return setErr("Password must be at least 6 characters.");
+    if (pw !== pw2) return setErr("Passwords don’t match.");
+    const data = { name: name.trim(), sub: sub.trim(), password: pw };
+    try { localStorage.setItem("letspray-setup", JSON.stringify(data)); } catch (_e) {}
+    onComplete(data);
+  }
+  const inp = { width:"100%", boxSizing:"border-box", background:"#222527", border:"1px solid #333839", borderRadius:10, color:"#e8e0d4", padding:"12px 14px", fontSize:15, fontFamily:"'Inter', system-ui, sans-serif", outline:"none" };
+  const lbl = { fontSize:11, color:"#7a8082", textTransform:"uppercase", letterSpacing:"0.06em", fontWeight:600, display:"block", marginBottom:5 };
+  return (
+    <div style={{ minHeight:"100vh", background:"#1a1c1e", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"32px 24px" }}>
+      <svg width="48" height="48" viewBox="0 0 20 20" style={{ marginBottom:16 }}>
+        <path d="M10,2 L11.768,8.232 L18,10 L11.768,11.768 L10,18 L8.232,11.768 L2,10 L8.232,8.232 Z" fill="#6b9e78" />
+      </svg>
+      <h1 style={{ fontFamily:"'Lora', Georgia, serif", fontSize:28, fontWeight:600, color:"#e8e0d4", margin:"0 0 6px", textAlign:"center" }}>Let’s Pray</h1>
+      <p style={{ fontSize:13, color:"#7a8082", margin:"0 0 32px", textAlign:"center" }}>First-time setup — takes about 30 seconds</p>
+      <div style={{ width:"100%", maxWidth:360, display:"flex", flexDirection:"column", gap:12 }}>
+        <div><label style={lbl}>Ministry Name</label><input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. First Baptist Students" style={inp} /></div>
+        <div><label style={lbl}>Subtitle <span style={{ opacity:0.5, fontWeight:400, textTransform:"none" }}>(optional)</span></label><input value={sub} onChange={e => setSub(e.target.value)} placeholder='e.g. "Let’s Pray"' style={inp} /></div>
+        <div><label style={lbl}>Admin Password</label><input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="Choose a password (6+ characters)" style={inp} /></div>
+        <div><label style={lbl}>Confirm Password</label><input type="password" value={pw2} onChange={e => setPw2(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} placeholder="Re-enter password" style={inp} /></div>
+        {err && <p style={{ color:"#c07070", fontSize:13, margin:0 }}>{err}</p>}
+        <button onClick={submit} style={{ background:"#6b9e78", border:"none", color:"#fff", borderRadius:12, padding:"14px 0", fontSize:15, fontWeight:600, cursor:"pointer", fontFamily:"'Inter', system-ui, sans-serif", marginTop:4 }}>Get Started</button>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  const [setup, setSetup] = React.useState(() => getSetup());
+  if (!setup) return <SetupScreen onComplete={s => setSetup(s)} />;
+  const ADMIN_PASSWORD = setup.password;
+  const MINISTRY_NAME = setup.name;
+  const MINISTRY_SUB = setup.sub || "";
+
   const [people, setPeople] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [view, setView] = useState("pray");
@@ -531,13 +541,6 @@ export default function App() {
   const [nameInput, setNameInput] = useState("");
   const [confirmPromo, setConfirmPromo] = useState(false);
   const [confirmClearInactive, setConfirmClearInactive] = useState(false);
-  const [pushSupported, setPushSupported] = useState(false);
-  const [pushEnabled, setPushEnabled] = useState(false);
-  const [pushTime, setPushTime] = useState(() => localStorage.getItem("intercede-push-time") || "09:00");
-  const [showIosGuide, setShowIosGuide] = useState(false);
-  const [pushLoading, setPushLoading] = useState(false);
-  const [pushError, setPushError] = useState("");
-  const [reminderExpanded, setReminderExpanded] = useState(() => { try { return localStorage.getItem('intercede-reminder-expanded') !== 'false'; } catch { return true; } });
   const [weekHistory, setWeekHistory] = useState([]);
   const [bdayInput, setBdayInput] = useState("");
 
@@ -560,45 +563,6 @@ export default function App() {
   const [adminPwError, setAdminPwError] = useState("");
   const [pendingView, setPendingView] = useState(null);
 
-  useEffect(() => {
-    // Check if push notifications are supported
-    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    const isStandalone = window.navigator.standalone === true;
-    const hasSW = "serviceWorker" in navigator;
-    const hasPush = "PushManager" in window;
-
-    if (hasSW && hasPush) {
-      // Full push support (Android, or iOS 16.4+ on home screen)
-      setPushSupported(true);
-      navigator.serviceWorker.ready.then(reg => {
-        reg.pushManager.getSubscription().then(sub => {
-          if (sub) setPushEnabled(true);
-        });
-      }).catch(() => {});
-    } else if (isIos && !isStandalone) {
-      // iOS in browser — needs to add to home screen first
-      setPushSupported("ios-prompt");
-    } else if (isIos && isStandalone && !hasPush) {
-      // iOS on home screen but iOS < 16.4 — push not supported
-      setPushSupported("ios-unsupported");
-    } else if (hasSW && !hasPush) {
-      // SW available but no PushManager — unsupported browser
-      setPushSupported(false);
-    }
-    // Register service worker and mark device as seen today
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").then(reg => {
-        reg.pushManager.getSubscription().then(sub => {
-          if (sub) {
-            const hash = btoa(sub.endpoint).slice(0, 40);
-            apiMarkSeen(hash).catch(() => {});
-          }
-        });
-      }).catch(() => {});
-    } else {
-      apiMarkSeen(null).catch(() => {});
-    }
-  }, []);
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -779,16 +743,6 @@ export default function App() {
   const pinnedPerson = pinnedPersonId ? activePeople.find(p => p.id === pinnedPersonId) ?? null : null;
   const current = pinnedPerson ?? deck[cardIdx] ?? null;
 
-  // Preload adjacent photos so they're cached before the swipe animation ends
-  React.useEffect(() => {
-    const toPreload = [deck[cardIdx - 1], deck[cardIdx + 1]].filter(Boolean);
-    toPreload.forEach(p => {
-      if (p?.photoUrl) {
-        const img = new Image();
-        img.src = p.photoUrl;
-      }
-    });
-  }, [cardIdx, deck]);
   const prayedPeople = activePeople.filter(p => withinWeek(p.prayedAt));
 
   // Streak: consecutive weeks where count >= total (everyone prayed for)
@@ -939,10 +893,6 @@ export default function App() {
 
   const [addGrade, setAddGrade] = useState("");
   const [addBday, setAddBday] = useState("");
-  const [justAddedId, setJustAddedId] = useState(null);
-  const [uploadingPhotoFor, setUploadingPhotoFor] = useState(null);
-  const [lightboxUrl, setLightboxUrl] = useState(null);
-  const [lightboxName, setLightboxName] = useState(null);
   const [peopleSort, setPeopleSort] = useState("name");
   const [peopleTypeFilter, setPeopleTypeFilter] = useState("all");
   const [rosterGroup, setRosterGroup] = useState("all"); // all | ms | hs | leader
@@ -950,13 +900,10 @@ export default function App() {
 
   function addPerson() {
     if (!addName.trim()) return;
-    const newId = genId();
-    setPeople(prev => [...prev, { id: newId, name: addName.trim(), type: addType, group: addType === "student" ? addGroup : null, grade: addType === "student" && addGrade ? Number(addGrade) : null, active: true, prayedAt: null, prayerRequests: [], birthday: addBday.trim() || "", updatedAt: Date.now() }]);
+    setPeople(prev => [...prev, { id: genId(), name: addName.trim(), type: addType, group: addType === "student" ? addGroup : null, grade: addType === "student" && addGrade ? Number(addGrade) : null, active: true, prayedAt: null, prayerRequests: [], birthday: addBday.trim() || "", updatedAt: Date.now() }]);
     setAddBday("");
     setAddName("");
     setAddGrade("");
-    setJustAddedId(newId);
-    setTimeout(() => setJustAddedId(null), 8000);
   }
 
   function cycleGroup(id) {
@@ -973,40 +920,6 @@ export default function App() {
 
   function deactivate(id) { setPeople(prev => prev.map(p => p.id === id ? { ...p, active: false, updatedAt: Date.now() } : p)); }
   function restore(id) { setPeople(prev => prev.map(p => p.id === id ? { ...p, active: true, updatedAt: Date.now() } : p)); }
-  async function uploadPhoto(personId, file) {
-    setUploadingPhotoFor(personId);
-    try {
-      // Resize client-side before upload
-      const resized = await resizeImage(file, 600);
-      const form = new FormData();
-      form.append("photo", resized, "photo.jpg");
-      form.append("personId", personId);
-      const res = await fetch("/api/photo-upload", { method: "POST", body: form });
-      const data = await res.json();
-      if (data.url) {
-        setPeople(prev => prev.map(p => p.id === personId
-          ? { ...p, photoUrl: data.url + "?t=" + Date.now(), updatedAt: Date.now() }
-          : p
-        ));
-      } else {
-        alert("Upload error: " + JSON.stringify(data));
-      }
-    } catch (e) { alert("Upload failed: " + e.message); }
-    setUploadingPhotoFor(null);
-  }
-
-  async function deletePhoto(personId) {
-    await fetch("/api/photo-upload", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ personId }),
-    }).catch(() => {});
-    setPeople(prev => prev.map(p => p.id === personId
-      ? { ...p, photoUrl: null, updatedAt: Date.now() }
-      : p
-    ));
-  }
-
   function exportRoster() {
     const rows = [
       ["First Name", "Last Name", "Type", "Group", "Grade", "Birthday"],
@@ -1135,60 +1048,6 @@ export default function App() {
     await apiSaveHistory(newHistory);
   }
 
-  async function enablePush() {
-    setPushLoading(true);
-    setPushError("");
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      const permission = await Notification.requestPermission();
-      if (permission === "denied") {
-        setPushError("Notifications blocked. Go to Settings → Safari → [this site] → Allow Notifications.");
-        setPushLoading(false);
-        return;
-      }
-      if (permission !== "granted") {
-        setPushError("Permission not granted. Please try again.");
-        setPushLoading(false);
-        return;
-      }
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-      });
-      const hash = btoa(sub.endpoint).slice(0, 40);
-      await apiRegisterPush(sub.toJSON(), pushTime);
-      localStorage.setItem("intercede-push-time", pushTime);
-      localStorage.setItem("intercede-push-hash", hash);
-      setPushEnabled(true);
-      setReminderExpanded(false);
-      try { localStorage.setItem('intercede-reminder-expanded', 'false'); } catch (_e) {}
-    } catch (e) {
-      setPushError("Error: " + (e.message || "Could not enable notifications."));
-    }
-    setPushLoading(false);
-  }
-
-  async function updatePushTime(time) {
-    setPushTime(time);
-    localStorage.setItem("intercede-push-time", time);
-    if (pushEnabled) {
-      try {
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg.pushManager.getSubscription();
-        if (sub) await apiRegisterPush(sub.toJSON(), time);
-      } catch (_e) {}
-    }
-  }
-
-  async function disablePush() {
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
-      if (sub) await sub.unsubscribe();
-      setPushEnabled(false);
-    } catch (_e) {}
-  }
-
   function submitAdminPw() {
     if (adminPwInput === ADMIN_PASSWORD) {
       setAdminAuthed(true);
@@ -1216,8 +1075,8 @@ export default function App() {
         <div style={S.logoWrap}>
           <svg width="16" height="16" viewBox="0 0 20 20" style={{ flexShrink:0, marginTop:2 }}><path d="M10,2 L11.768,8.232 L18,10 L11.768,11.768 L10,18 L8.232,11.768 L2,10 L8.232,8.232 Z" fill="#6b9e78" /></svg>
           <div style={{ display:"flex", flexDirection:"column", lineHeight:1 }}>
-            <span style={S.logoText}>Let’s Pray</span>
-            <span style={S.logoSub}>Calvary Students</span>
+            <span style={S.logoText}>{MINISTRY_NAME}</span>
+            {MINISTRY_SUB && <span style={S.logoSub}>{MINISTRY_SUB}</span>}
           </div>
         </div>
         <div style={{ ...S.weekBar, cursor: "pointer" }} onClick={() => setView("week")}>
@@ -1375,49 +1234,6 @@ export default function App() {
                           </div>
                         )}
                       </div>
-
-                      {/* Photo — taped to bottom-right corner, absolutely positioned */}
-                      {current?.photoUrl && (
-                        <div style={{
-                          position: "absolute",
-                          top: 20,
-                          right: 20,
-                          zIndex: 3,
-                          display: "inline-block",
-                        }}>
-                          {/* Tape strip */}
-                          <div style={{
-                            position: "absolute",
-                            top: -7,
-                            left: "50%",
-                            transform: "translateX(-50%)",
-                            width: 42,
-                            height: 12,
-                            background: "rgba(255,255,255,0.55)",
-                            borderRadius: 2,
-                            zIndex: 2,
-                            boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
-                          }} />
-                          <img
-                            src={current.photoUrl}
-                            alt={current.name}
-                            onClick={() => { setLightboxUrl(current.photoUrl); setLightboxName(current.name); }}
-                            style={{
-                              width: 88,
-                              height: 66,
-                              objectFit: "cover",
-                              display: "block",
-                              borderRadius: 2,
-                              transform: `rotate(${photoRotation(current.id)}deg)`,
-                              boxShadow: "0 3px 12px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.3)",
-                              border: "3px solid #f0ebe4",
-                              position: "relative",
-                              zIndex: 1,
-                              cursor: "pointer",
-                            }}
-                          />
-                        </div>
-                      )}
 
                       {/* Name — primary */}
                       <h2 style={S.cardName}>{current?.name}</h2>
@@ -1703,20 +1519,7 @@ export default function App() {
                         <button onClick={() => setEditNameFor(null)} style={S.reqCancelBtn}><X size={12} /></button>
                       </div>
                     ) : (
-                      <div style={{ ...S.nameRow, ...(p.id === justAddedId ? { background: C.accentBg, margin:"-8px -8px 0", padding:"8px 8px 0", borderRadius:"8px 8px 0 0" } : {}) }}>
-                        {/* Photo thumbnail / upload */}
-                        <label style={{ cursor:"pointer", display:"flex", alignItems:"center", marginRight:8, flexShrink:0, position:"relative" }} title="Upload photo">
-                          <input type="file" accept="image/*" style={{ display:"none" }} onChange={e => { if (e.target.files[0]) uploadPhoto(p.id, e.target.files[0]); e.target.value=""; }} />
-                          {uploadingPhotoFor === p.id
-                            ? <span style={{ fontSize:11, color:C.muted }}>…</span>
-                            : p.photoUrl
-                              ? <img src={p.photoUrl} style={{ width:28, height:28, objectFit:"cover", borderRadius:3, border:`1px solid ${C.border}` }} />
-                              : <span style={{ fontSize:16, opacity: p.id === justAddedId ? 1 : 0.4 }}>📷</span>
-                          }
-                          {p.id === justAddedId && !p.photoUrl && (
-                            <span style={{ position:"absolute", top:-18, left:"50%", transform:"translateX(-50%)", background:C.accent, color:"#fff", fontSize:9, fontWeight:600, borderRadius:4, padding:"2px 5px", whiteSpace:"nowrap", pointerEvents:"none" }}>Add photo</span>
-                          )}
-                        </label>
+                      <div style={S.nameRow}>
                         <span style={S.personName}>{p.name}</span>
                         <button onClick={() => { setEditNameFor(p.id); setNameInput(p.name); setEditBdayFor(null); }}
                           style={S.editNameBtn} title="Edit name">✎</button>
@@ -1866,14 +1669,7 @@ export default function App() {
                 return (
                   <div key={p.id} style={{ display:"flex", alignItems:"center", padding:"11px 14px", background:C.surface, borderRadius:8, gap:12 }}>
                     {/* Photo */}
-                    {p.photoUrl && (
-                      <img
-                        src={p.photoUrl}
-                        alt={p.name}
-                        onClick={e => { e.stopPropagation(); setLightboxUrl(p.photoUrl); setLightboxName(p.name); }}
-                        style={{ width:52, height:52, objectFit:"cover", borderRadius:3, border:"2px solid #f0ebe4", boxShadow:"0 2px 6px rgba(0,0,0,0.5)", transform:`rotate(${photoRotation(p.id)}deg)`, flexShrink:0, cursor:"pointer" }}
-                      />
-                    )}
+
                     {/* Text — left aligned below name */}
                     <div style={{ display:"flex", flexDirection:"column", gap:3, flex:1, minWidth:0 }}>
                       <span style={{ fontSize:15, color:C.cream, fontFamily:"'Lora', Georgia, serif" }}>{p.name}</span>
@@ -2014,95 +1810,6 @@ export default function App() {
 
         </div>
       )}
-      {/* Reminders section */}
-      {view === "pray" && (
-      <div style={S.reminderSection}>
-        {/* Header row — always visible, tappable to expand/collapse */}
-        <button onClick={() => setReminderExpanded(e => { const next = !e; try { localStorage.setItem("intercede-reminder-expanded", String(next)); } catch (_e) {} return next; })} style={{ background:"none", border:"none", padding:0, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"space-between", width:"100%" }}>
-          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <Bell size={14} color={pushEnabled ? C.accent : C.muted} />
-            <p style={{ ...S.reminderTitle, color: pushEnabled ? C.accent : C.muted, margin:0 }}>
-              {pushEnabled ? `Reminders on · ${(() => { const [h, m] = pushTime.split(":").map(Number); const ampm = h >= 12 ? "PM" : "AM"; const h12 = h % 12 || 12; return `${h12}:${String(m).padStart(2,"0")} ${ampm}`; })()}` : "Daily Reminders"}
-            </p>
-          </div>
-          <span style={{ fontSize:10, color:C.muted, opacity:0.6 }}>{reminderExpanded ? "▲" : "▼"}</span>
-        </button>
-
-        {reminderExpanded && (<>
-          {/* iOS not on home screen */}
-          {pushSupported === "ios-prompt" && !showIosGuide && (
-            <button onClick={() => setShowIosGuide(true)} style={S.reminderSetupBtn}>
-              Set up reminders on iPhone
-            </button>
-          )}
-
-          {showIosGuide && (
-            <div style={S.iosGuide}>
-              <p style={S.iosGuideTitle}>Add to your Home Screen first:</p>
-              <div style={S.iosStep}><span style={S.iosStepNum}>1</span><span>Open this page in <strong style={{color:C.cream}}>Safari</strong> (not Chrome)</span></div>
-              <div style={S.iosStep}><span style={S.iosStepNum}>2</span><span>Tap the <strong style={{color:C.cream}}>Share</strong> button <span style={{fontSize:16}}>⎋</span> at the bottom</span></div>
-              <div style={S.iosStep}><span style={S.iosStepNum}>3</span><span>Tap <strong style={{color:C.cream}}>Add to Home Screen</strong></span></div>
-              <div style={S.iosStep}><span style={S.iosStepNum}>4</span><span>Open the app from your Home Screen and come back here</span></div>
-              <button onClick={() => setShowIosGuide(false)} style={S.iosDismiss}>Got it</button>
-            </div>
-          )}
-
-          {pushSupported === "ios-unsupported" && (
-            <p style={{ fontSize:12, color:C.muted, margin:0, lineHeight:1.6 }}>
-              Daily reminders require iOS 16.4 or later. Please update your iPhone to use this feature.
-            </p>
-          )}
-
-          {pushSupported === true && (
-            <div style={S.reminderControls}>
-              {pushEnabled ? (
-                <>
-                  <div style={S.reminderRow}>
-                    <span style={S.reminderLabel}>Reminder time</span>
-                    <input type="time" value={pushTime} onChange={e => updatePushTime(e.target.value)}
-                      style={S.timeInput} />
-                  </div>
-                  <button onClick={disablePush} style={S.reminderOffBtn}>Turn off reminders</button>
-                </>
-              ) : (
-                <>
-                  <div style={S.reminderRow}>
-                    <span style={S.reminderLabel}>Remind me daily at</span>
-                    <input type="time" value={pushTime} onChange={e => setPushTime(e.target.value)}
-                      style={S.timeInput} />
-                  </div>
-                  <button onClick={enablePush} disabled={pushLoading} style={S.reminderOnBtn}>
-                    {pushLoading ? "Setting up…" : "Enable reminders"}
-                  </button>
-                  {pushError && <p style={{ fontSize:12, color:"#c07070", margin:0, lineHeight:1.5 }}>{pushError}</p>}
-                </>
-              )}
-            </div>
-          )}
-        </>)}
-      </div>
-      )}
-
-      {/* Lightbox */}
-      {lightboxUrl && (
-        <div
-          onClick={() => setLightboxUrl(null)}
-          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:100, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:16, padding:24, backdropFilter:"blur(6px)" }}
-        >
-          <div style={{ position:"relative", display:"inline-block" }} onClick={e => e.stopPropagation()}>
-            {/* Tape */}
-            <div style={{ position:"absolute", top:-10, left:"50%", transform:"translateX(-50%)", width:72, height:16, background:"rgba(255,255,255,0.55)", borderRadius:2, zIndex:2, boxShadow:"0 1px 4px rgba(0,0,0,0.2)" }} />
-            <img
-              src={lightboxUrl.split("?")[0]}
-              alt={lightboxName}
-              style={{ display:"block", maxWidth:"min(600px, calc(100vw - 48px))", maxHeight:"70vh", objectFit:"contain", border:"4px solid #f0ebe4", borderRadius:2, boxShadow:"0 8px 40px rgba(0,0,0,0.8)", position:"relative", zIndex:1 }}
-            />
-          </div>
-          <p style={{ color:"rgba(255,255,255,0.7)", fontSize:16, fontFamily:"'Lora', Georgia, serif", margin:0 }}>{lightboxName}</p>
-          <p style={{ color:"rgba(255,255,255,0.35)", fontSize:12, margin:0, fontFamily:"'Inter', system-ui, sans-serif" }}>Tap anywhere to close</p>
-        </div>
-      )}
-
       {/* Admin footer link */}
       <div style={S.adminFooter}>
         {adminAuthed
@@ -2285,20 +1992,10 @@ const S = {
   reportBarFill: { height: "100%", background: `linear-gradient(90deg, ${C.accent}, ${C.accentLight})`, borderRadius: 3, transition: "width 0.6s ease" },
   reportPct: { fontSize: 11, color: C.muted },
   // REMINDERS
-  reminderSection: { margin: "16px 20px 0", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 },
-  reminderTitle: { fontSize: 12, color: C.muted, fontWeight: 500, margin: 0, textTransform: "uppercase", letterSpacing: "0.06em" },
   reminderSetupBtn: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 10, padding: "10px 14px", fontSize: 13, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif", textAlign: "left" },
-  iosGuide: { background: C.surface, borderRadius: 10, padding: "14px", display: "flex", flexDirection: "column", gap: 10 },
-  iosGuideTitle: { fontSize: 12, color: C.cream, margin: 0, fontWeight: 500 },
-  iosStep: { display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: C.muted, lineHeight: 1.5 },
-  iosStepNum: { background: C.accent, color: C.bg, borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0, marginTop: 1 },
   iosDismiss: { background: "none", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: "7px 14px", fontSize: 12, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif", alignSelf: "flex-start", marginTop: 4 },
-  reminderControls: { display: "flex", flexDirection: "column", gap: 10 },
-  reminderRow: { display: "flex", alignItems: "center", justifyContent: "space-between" },
-  reminderLabel: { fontSize: 13, color: C.muted },
   timeInput: { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, color: C.cream, padding: "6px 10px", fontSize: 13, fontFamily: "'Inter', system-ui, sans-serif", outline: "none", cursor: "pointer" },
-    reminderOnBtn: { background: C.accent, border: "none", color: "#fff", borderRadius: 10, padding: "11px 0", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
-  reminderOffBtn: { background: "none", border: `1px solid ${C.border}`, color: "#8a5050", borderRadius: 10, padding: "9px 0", fontSize: 12, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
+    reminderOffBtn: { background: "none", border: `1px solid ${C.border}`, color: "#8a5050", borderRadius: 10, padding: "9px 0", fontSize: 12, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif" },
   // ADMIN FOOTER
   adminFooter: { display: "flex", justifyContent: "center", padding: "12px 0 20px", marginTop: "auto" },
   adminLink: { background: "none", border: "none", color: C.border, fontSize: 11, cursor: "pointer", fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: "0.06em" },
