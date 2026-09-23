@@ -1217,7 +1217,7 @@ export default function App() {
           <svg width="16" height="16" viewBox="0 0 20 20" style={{ flexShrink:0, marginTop:2 }}><path d="M10,2 L11.768,8.232 L18,10 L11.768,11.768 L10,18 L8.232,11.768 L2,10 L8.232,8.232 Z" fill="#6b9e78" /></svg>
           <div style={{ display:"flex", flexDirection:"column", lineHeight:1 }}>
             <span style={S.logoText}>Let’s Pray</span>
-            <span style={S.logoSub}>Calvary Students</span>
+            <span style={S.logoSub}>2ND Students</span>
           </div>
         </div>
         <div style={{ ...S.weekBar, cursor: "pointer" }} onClick={() => setView("week")}>
