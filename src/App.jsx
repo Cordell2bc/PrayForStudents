@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, Heart, Plus, Trash2, Upload, X, RefreshCw, BookOpen, RotateCcw, Cake, BarChart2, Bell, Star, Lightbulb } from "lucide-react";
 
 const STORAGE_KEY = "intercede-people-v2";
-const ADMIN_PASSWORD = "Promo1398!";
+const ADMIN_PASSWORD = "Pray2bc";
 const VAPID_PUBLIC_KEY = "BI4OYduhY_kBu_GJZtEsQAURClmTLOKMFM23GDuZ5EKd6z7dP5NcuCa0bZVv9eShUr9-gCFrhT1WenkRZAa4vJw";
 
 function urlBase64ToUint8Array(base64String) {
